@@ -1,4 +1,599 @@
-<!DOCTYPE html>
+<!<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>תיק מגדלים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1d2419; --ink-2:#4a5344; --ink-3:#7c8375;
+  --paper:#fbfbf8; --panel:#ffffff; --line:#dfe1d8;
+  --field:#3f6b3a; --field-soft:#eaf0e6;
+  --clay:#a8631c; --clay-soft:#faf0e2;
+  --brick:#973128; --brick-soft:#fbeae7;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Heebo',system-ui,sans-serif; font-weight:400; font-size:16px; line-height:1.6;
+  color:var(--ink); background:var(--paper); -webkit-text-size-adjust:100%;
+}
+a{color:var(--field)}
+button{font-family:inherit;font-size:15px;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:16px;width:100%;padding:9px 11px;
+  border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink)}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--field);outline-offset:1px}
+label{display:block;font-size:13px;color:var(--ink-2);margin:12px 0 4px}
+textarea{min-height:70px;resize:vertical}
+
+header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 16px 8px}
+.bar h1{margin:0;font-size:19px;font-weight:500;letter-spacing:-.01em}
+.bar span{font-size:12px;color:var(--ink-3)}
+nav{display:flex;gap:2px;overflow-x:auto;padding:0 10px 0;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{border:0;background:none;color:var(--ink-2);padding:8px 10px 11px;white-space:nowrap;
+  border-bottom:2px solid transparent}
+nav button.on{color:var(--ink);border-bottom-color:var(--field);font-weight:500}
+
+main{padding:14px 16px 90px;max-width:760px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.stack{display:flex;flex-direction:column;gap:3px;min-width:0}
+.name{font-weight:500}
+.meta{font-size:13px;color:var(--ink-3);word-break:break-word}
+.btn{border:1px solid var(--field);background:var(--field);color:#fff;border-radius:var(--r);padding:9px 14px}
+.btn.ghost{background:var(--panel);color:var(--ink);border-color:var(--line)}
+.btn.warn{background:var(--brick);border-color:var(--brick)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.p-ok{background:var(--field-soft);color:#2c4d28}
+.p-warn{background:var(--clay-soft);color:#7a4712}
+.p-bad{background:var(--brick-soft);color:#7a2820}
+.dots{display:flex;gap:5px;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.d-ok{background:var(--field)} .d-warn{background:var(--clay)} .d-bad{background:var(--brick)}
+.legend{font-size:12px;color:var(--ink-3);margin:2px 0 12px}
+.alert{border-right:3px solid var(--clay);border-radius:0 12px 12px 0}
+.alert.bad{border-right-color:var(--brick)}
+.empty{text-align:center;color:var(--ink-3);padding:30px 10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+h2{font-size:17px;font-weight:500;margin:20px 0 8px}
+h2:first-child{margin-top:4px}
+
+.sheet{position:fixed;inset:0;background:rgba(20,25,18,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet>div{background:var(--panel);width:100%;max-width:640px;max-height:92vh;overflow:auto;
+  border-radius:16px 16px 0 0;padding:18px 16px 28px}
+.sheet h3{margin:0 0 4px;font-size:18px;font-weight:500}
+.close{float:left;border:0;background:none;font-size:24px;line-height:1;color:var(--ink-3);padding:0 4px}
+.toast{position:fixed;bottom:20px;right:50%;transform:translateX(50%);background:var(--ink);color:#fff;
+  padding:9px 16px;border-radius:20px;font-size:14px;z-index:80}
+.pack{white-space:pre-wrap;font-size:14px;line-height:1.65;direction:ltr;text-align:left;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.setup{max-width:420px;margin:40px auto;padding:0 20px}
+@media print{header,nav,.btnrow,.no-print{display:none}.pack{border:0;padding:0}}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+/* ---------- הגדרות חיבור ----------
+   אפשר להטמיע כאן קבוע, או להשאיר ריק ולהזין פעם אחת במסך ההתקנה. */
+const BUILT_IN_URL = '';
+const BUILT_IN_KEY = '';
+
+const cfg = {
+  url: BUILT_IN_URL || localStorage.getItem('sb_url') || '',
+  key: BUILT_IN_KEY || localStorage.getItem('sb_key') || ''
+};
+let sb = null, session = null;
+let growers = [], docs = [], reg = [];
+let view = 'status';
+const app = document.getElementById('app');
+
+/* ---------- עזר ---------- */
+const el = id => document.getElementById(id);
+const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => new Date();
+const iso = d => d.toISOString().slice(0,10);
+const parse = s => s ? new Date(s + 'T00:00:00') : null;
+const days = (a,b) => Math.round((a-b)/86400000);
+function fmt(s){ if(!s) return '—'; const d=parse(s); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
+function fmtEn(s){ if(!s) return '—'; const d=parse(s);
+  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+
+const KINDS = { residue:'שאריות הדברה', micro:'מיקרוביולוגיה', water:'בדיקת מים', audit:'דוח מבדק',
+  cert:'תעודה', grasp:'GRASP', ppl:'רשימת תכשירים', declaration:'הצהרת ספק', other:'אחר' };
+const KINDS_EN = { residue:'Pesticide residue analysis', micro:'Microbiological analysis',
+  water:'Water analysis', audit:'Audit report', cert:'Certificate', grasp:'GRASP',
+  ppl:'Plant protection product list', declaration:'Supplier declaration', other:'Other' };
+const RESULTS = { pass:'עובר', pass_qualified:'עובר בהסתייגות', fail:'נכשל', pending:'ממתין', na:'לא רלוונטי' };
+const RESULTS_EN = { pass:'Within specification', pass_qualified:'Accepted with limitations',
+  fail:'Not accepted', pending:'Pending', na:'—' };
+
+/* ---------- מצב מגדל ---------- */
+function latest(gid, kind){
+  return docs.filter(d => d.grower_id===gid && d.kind===kind && d.sampled_on)
+             .sort((a,b)=>b.sampled_on.localeCompare(a.sampled_on))[0] || null;
+}
+function certState(g){
+  if(!g.cert_to) return {s:'warn', t:'אין תאריך תעודה'};
+  const left = days(parse(g.cert_to), today());
+  if(left < 0)  return {s:'bad',  t:`התעודה פגה לפני ${-left} ימים`};
+  if(left < 60) return {s:'warn', t:`התעודה פגה בעוד ${left} ימים`};
+  return {s:'ok', t:`תעודה בתוקף עד ${fmt(g.cert_to)}`};
+}
+function testState(g, kind){
+  const lim = kind==='residue' ? (g.residue_days||90) : (g.micro_days||90);
+  const d = latest(g.id, kind);
+  const label = kind==='residue' ? 'בדיקת שאריות' : 'בדיקה מיקרוביולוגית';
+  if(!d) return {s:'bad', t:`אין ${label} כלל`};
+  const age = days(today(), parse(d.sampled_on));
+  if(age > lim)      return {s:'bad',  t:`${label} אחרונה לפני ${age} ימים`};
+  if(age > lim*0.8)  return {s:'warn', t:`${label} מתקרבת למועד — לפני ${age} ימים`};
+  return {s:'ok', t:`${label} מ-${fmt(d.sampled_on)}`};
+}
+function alerts(){
+  const out = [];
+  growers.filter(g=>g.active!==false).forEach(g=>{
+    [certState(g), testState(g,'residue'), testState(g,'micro')].forEach(st=>{
+      if(st.s!=='ok') out.push({sev:st.s, who:g.name, what:st.t, gid:g.id});
+    });
+  });
+  docs.filter(d=>d.result==='fail').forEach(d=>{
+    const g = growers.find(x=>x.id===d.grower_id);
+    out.push({sev:'bad', who:g?g.name:'—', what:`תוצאה שנכשלה: ${d.title}`, gid:d.grower_id});
+  });
+  reg.filter(r=>r.direction==='out' && !r.ack).forEach(r=>
+    out.push({sev:'bad', who:'FDA', what:`הגשה ללא אישור קליטה: ${r.title}`}));
+  return out.sort(a=>a.sev==='bad'?-1:1);
+}
+
+/* ---------- טעינה ---------- */
+async function loadAll(){
+  const [a,b,c] = await Promise.all([
+    sb.from('growers').select('*').order('name'),
+    sb.from('documents').select('*').order('sampled_on',{ascending:false}),
+    sb.from('reg_log').select('*').order('happened_on',{ascending:false})
+  ]);
+  if(a.error||b.error||c.error){ toast('שגיאה בטעינת הנתונים'); console.error(a.error||b.error||c.error); }
+  growers = a.data||[]; docs = b.data||[]; reg = c.data||[];
+}
+
+/* ---------- שלד ---------- */
+function chrome(){
+  const tabs = [['status','מצב'],['growers','מגדלים'],['docs','מסמכים'],['pack','חבילת לקוח'],['reg','FDA']];
+  app.innerHTML = `
+  <header>
+    <div class="bar"><h1>תיק מגדלים</h1><span>${fmt(iso(today()))}</span></div>
+    <nav>${tabs.map(([k,l])=>`<button data-v="${k}" class="${view===k?'on':''}">${l}</button>`).join('')}</nav>
+  </header>
+  <main id="main"></main>`;
+  app.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ view=b.dataset.v; chrome(); });
+  ({status:vStatus, growers:vGrowers, docs:vDocs, pack:vPack, reg:vReg})[view]();
+}
+
+/* ---------- מצב ---------- */
+function vStatus(){
+  const al = alerts();
+  const m = el('main');
+  m.innerHTML = `
+    <h2>דורש טיפול</h2>
+    ${al.length ? al.map(a=>`
+      <div class="card alert ${a.sev==='bad'?'bad':''}">
+        <div class="stack"><span class="name">${esc(a.who)}</span>
+        <span class="meta">${esc(a.what)}</span></div>
+      </div>`).join('')
+      : '<div class="card"><div class="meta">אין חריגים פתוחים.</div></div>'}
+
+    <h2>מצב לפי מגדל</h2>
+    <div class="legend">שלוש הנקודות: תעודה · שאריות · מיקרוביולוגיה</div>
+    ${growers.filter(g=>g.active!==false).map(g=>{
+      const st=[certState(g),testState(g,'residue'),testState(g,'micro')];
+      return `<div class="card"><div class="row">
+        <div class="stack">
+          <span class="name">${esc(g.name)}</span>
+          <span class="meta">${esc(g.country||'')}${g.ggn?' · GGN '+esc(g.ggn):''}</span>
+          ${st.filter(x=>x.s!=='ok').map(x=>`<span class="meta">${esc(x.t)}</span>`).join('')}
+        </div>
+        <div class="dots">${st.map(x=>`<span class="dot d-${x.s}" title="${esc(x.t)}"></span>`).join('')}</div>
+      </div></div>`;
+    }).join('')}
+    <div class="btnrow no-print" style="margin-top:20px">
+      <button class="btn ghost sm" onclick="window.__resetCfg()">שינוי חיבור</button>
+    </div>`;
+}
+window.__resetCfg = ()=>{
+  if(!confirm('לנתק את החיבור למסד הנתונים במכשיר הזה?')) return;
+  localStorage.removeItem('sb_url'); localStorage.removeItem('sb_key'); location.reload();
+};
+
+/* ---------- מגדלים ---------- */
+function vGrowers(){
+  el('main').innerHTML = `
+    <div class="btnrow"><button class="btn" id="add">מגדל חדש</button></div>
+    ${growers.map(g=>{
+      const c=certState(g);
+      return `<div class="card"><div class="row">
+        <div class="stack">
+          <span class="name">${esc(g.name)}${g.active===false?' (לא פעיל)':''}</span>
+          <span class="meta">${esc(g.country||'')}${g.ggn?' · GGN '+esc(g.ggn):''}</span>
+          <span class="meta">${esc(g.products||'')}</span>
+        </div>
+        <div class="stack" style="align-items:flex-start;gap:6px">
+          <span class="pill p-${c.s==='ok'?'ok':c.s==='warn'?'warn':'bad'}">${esc(fmt(g.cert_to))}</span>
+          <button class="btn sm ghost" data-g="${g.id}">ערוך</button>
+        </div>
+      </div></div>`;
+    }).join('') || '<div class="empty">אין מגדלים.</div>'}`;
+  el('add').onclick = ()=>editGrower();
+  document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>editGrower(b.dataset.g));
+}
+
+function editGrower(id){
+  const g = id ? growers.find(x=>x.id===id) : {residue_days:90, micro_days:90, active:true};
+  open(`
+    <button class="close" onclick="window.__close()">×</button>
+    <h3>${id?'עריכת מגדל':'מגדל חדש'}</h3>
+    <label for="g_name">שם</label><input id="g_name" value="${esc(g.name)}">
+    <div class="grid2">
+      <div><label for="g_country">מדינה</label><input id="g_country" value="${esc(g.country)}"></div>
+      <div><label for="g_ggn">GGN</label><input id="g_ggn" value="${esc(g.ggn)}"></div>
+    </div>
+    <div class="grid2">
+      <div><label for="g_body">גוף מסמיך</label><input id="g_body" value="${esc(g.cert_body)}"></div>
+      <div><label for="g_cert">מספר תעודה</label><input id="g_cert" value="${esc(g.cert_no)}"></div>
+    </div>
+    <div class="grid2">
+      <div><label for="g_from">תוקף מ-</label><input type="date" id="g_from" value="${esc(g.cert_from)}"></div>
+      <div><label for="g_to">תוקף עד</label><input type="date" id="g_to" value="${esc(g.cert_to)}"></div>
+    </div>
+    <label for="g_prod">מוצרים</label><input id="g_prod" value="${esc(g.products)}">
+    <label for="g_mkt">שווקי יעד</label><input id="g_mkt" value="${esc(g.markets)}">
+    <div class="grid2">
+      <div><label for="g_rd">תדירות שאריות (ימים)</label><input type="number" id="g_rd" value="${g.residue_days??90}"></div>
+      <div><label for="g_md">תדירות מיקרו (ימים)</label><input type="number" id="g_md" value="${g.micro_days??90}"></div>
+    </div>
+    <label for="g_active">סטטוס</label>
+    <select id="g_active"><option value="1" ${g.active!==false?'selected':''}>פעיל</option>
+      <option value="0" ${g.active===false?'selected':''}>לא פעיל</option></select>
+    <label for="g_notes">הערות</label><textarea id="g_notes">${esc(g.notes)}</textarea>
+    <div class="btnrow">
+      <button class="btn" id="save">שמור</button>
+      ${id?'<button class="btn warn" id="del">מחק</button>':''}
+      <button class="btn ghost" onclick="window.__close()">ביטול</button>
+    </div>`);
+  el('save').onclick = async ()=>{
+    const v = x => el(x).value.trim() || null;
+    const rec = { name:v('g_name'), country:v('g_country'), ggn:v('g_ggn'), cert_body:v('g_body'),
+      cert_no:v('g_cert'), cert_from:v('g_from'), cert_to:v('g_to'), products:v('g_prod'),
+      markets:v('g_mkt'), residue_days:+el('g_rd').value||90, micro_days:+el('g_md').value||90,
+      active:el('g_active').value==='1', notes:v('g_notes') };
+    if(!rec.name) return toast('צריך שם');
+    const q = id ? sb.from('growers').update(rec).eq('id',id) : sb.from('growers').insert(rec);
+    const {error} = await q;
+    if(error) return toast('לא נשמר');
+    await loadAll(); close(); chrome(); toast('נשמר');
+  };
+  if(id) el('del').onclick = async ()=>{
+    if(!confirm('למחוק את המגדל וכל המסמכים שלו?')) return;
+    await sb.from('growers').delete().eq('id',id);
+    await loadAll(); close(); chrome(); toast('נמחק');
+  };
+}
+
+/* ---------- מסמכים ---------- */
+let fG='', fK='';
+function vDocs(){
+  const list = docs.filter(d=>(!fG||d.grower_id===fG)&&(!fK||d.kind===fK));
+  el('main').innerHTML = `
+    <div class="btnrow"><button class="btn" id="add">מסמך חדש</button></div>
+    <div class="grid2">
+      <div><label for="f_g">מגדל</label><select id="f_g"><option value="">הכל</option>
+        ${growers.map(g=>`<option value="${g.id}" ${fG===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div>
+      <div><label for="f_k">סוג</label><select id="f_k"><option value="">הכל</option>
+        ${Object.entries(KINDS).map(([k,l])=>`<option value="${k}" ${fK===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div style="margin-top:14px">${list.map(d=>{
+      const g=growers.find(x=>x.id===d.grower_id);
+      const p = d.result==='fail'?'p-bad':d.result==='pass'?'p-ok':d.result==='pass_qualified'?'p-warn':'p-warn';
+      return `<div class="card"><div class="row">
+        <div class="stack">
+          <span class="name">${esc(d.title)}</span>
+          <span class="meta">${esc(g?g.name:'—')} · ${esc(KINDS[d.kind]||d.kind)}</span>
+          <span class="meta">נדגם ${fmt(d.sampled_on)}${d.reported_on?' · דוח '+fmt(d.reported_on):''}</span>
+          ${d.criterion?`<span class="meta">מול ${esc(d.criterion)}</span>`:''}
+          ${d.reviewed_on?`<span class="meta">נסקר ${fmt(d.reviewed_on)}${d.reviewed_by?' · '+esc(d.reviewed_by):''}</span>`:''}
+          ${d.notes?`<span class="meta">${esc(d.notes)}</span>`:''}
+          ${d.link?`<span class="meta"><a href="${esc(d.link)}" target="_blank" rel="noopener">פתח קובץ</a></span>`:''}
+        </div>
+        <div class="stack" style="align-items:flex-start;gap:6px">
+          <span class="pill ${p}">${esc(RESULTS[d.result]||d.result)}</span>
+          <button class="btn sm ghost" data-d="${d.id}">ערוך</button>
+        </div>
+      </div></div>`;
+    }).join('') || '<div class="empty">אין מסמכים בסינון הזה.</div>'}</div>`;
+  el('f_g').onchange = e=>{ fG=e.target.value; vDocs(); };
+  el('f_k').onchange = e=>{ fK=e.target.value; vDocs(); };
+  el('add').onclick = ()=>editDoc();
+  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>editDoc(b.dataset.d));
+}
+
+function editDoc(id){
+  const d = id ? docs.find(x=>x.id===id) : {kind:'residue', result:'pass', grower_id:fG||(growers[0]||{}).id};
+  open(`
+    <button class="close" onclick="window.__close()">×</button>
+    <h3>${id?'עריכת מסמך':'מסמך חדש'}</h3>
+    <label for="d_g">מגדל</label>
+    <select id="d_g">${growers.map(g=>`<option value="${g.id}" ${d.grower_id===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select>
+    <label for="d_k">סוג</label>
+    <select id="d_k">${Object.entries(KINDS).map(([k,l])=>`<option value="${k}" ${d.kind===k?'selected':''}>${l}</option>`).join('')}</select>
+    <label for="d_t">כותרת</label><input id="d_t" value="${esc(d.title)}">
+    <div class="grid2">
+      <div><label for="d_lab">מעבדה / גוף</label><input id="d_lab" value="${esc(d.lab)}"></div>
+      <div><label for="d_ref">מספר דוח</label><input id="d_ref" value="${esc(d.ref_no)}"></div>
+    </div>
+    <label for="d_p">מוצר</label><input id="d_p" value="${esc(d.product)}">
+    <div class="grid2">
+      <div><label for="d_s">תאריך דגימה</label><input type="date" id="d_s" value="${esc(d.sampled_on)}"></div>
+      <div><label for="d_r">תאריך הדוח</label><input type="date" id="d_r" value="${esc(d.reported_on)}"></div>
+    </div>
+    <div class="grid2">
+      <div><label for="d_rec">תאריך קבלה אצלך</label><input type="date" id="d_rec" value="${esc(d.received_on)}"></div>
+      <div><label for="d_exp">תוקף עד (לתעודות)</label><input type="date" id="d_exp" value="${esc(d.expires_on)}"></div>
+    </div>
+    <label for="d_res">תוצאה</label>
+    <select id="d_res">${Object.entries(RESULTS).map(([k,l])=>`<option value="${k}" ${d.result===k?'selected':''}>${l}</option>`).join('')}</select>
+    <label for="d_c">מול איזה קריטריון נבחן</label>
+    <input id="d_c" value="${esc(d.criterion)}" placeholder="EC 396/2005 · 40 CFR 180 · ISO 6579">
+    <div class="grid2">
+      <div><label for="d_ro">תאריך סקירה וחתימה</label><input type="date" id="d_ro" value="${esc(d.reviewed_on)}"></div>
+      <div><label for="d_rb">נסקר על ידי</label><input id="d_rb" value="${esc(d.reviewed_by)}"></div>
+    </div>
+    <label for="d_l">קישור לקובץ בדרייב</label><input id="d_l" value="${esc(d.link)}">
+    <label for="d_n">הערות ומגבלות</label><textarea id="d_n">${esc(d.notes)}</textarea>
+    <div class="btnrow">
+      <button class="btn" id="save">שמור</button>
+      ${id?'<button class="btn warn" id="del">מחק</button>':''}
+      <button class="btn ghost" onclick="window.__close()">ביטול</button>
+    </div>`);
+  el('save').onclick = async ()=>{
+    const v = x => el(x).value.trim() || null;
+    const rec = { grower_id:el('d_g').value, kind:el('d_k').value, title:v('d_t'), lab:v('d_lab'),
+      ref_no:v('d_ref'), product:v('d_p'), sampled_on:v('d_s'), reported_on:v('d_r'),
+      received_on:v('d_rec'), expires_on:v('d_exp'), result:el('d_res').value, criterion:v('d_c'),
+      reviewed_on:v('d_ro'), reviewed_by:v('d_rb'), link:v('d_l'), notes:v('d_n') };
+    if(!rec.title) return toast('צריך כותרת');
+    const q = id ? sb.from('documents').update(rec).eq('id',id) : sb.from('documents').insert(rec);
+    const {error} = await q;
+    if(error) return toast('לא נשמר');
+    await loadAll(); close(); chrome(); toast('נשמר');
+  };
+  if(id) el('del').onclick = async ()=>{
+    if(!confirm('למחוק את המסמך?')) return;
+    await sb.from('documents').delete().eq('id',id);
+    await loadAll(); close(); chrome(); toast('נמחק');
+  };
+}
+
+/* ---------- חבילת לקוח ---------- */
+let pG='', pW=90;
+function vPack(){
+  el('main').innerHTML = `
+    <div class="grid2">
+      <div><label for="p_g">מגדל</label><select id="p_g"><option value="">בחר</option>
+        ${growers.map(g=>`<option value="${g.id}" ${pG===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div>
+      <div><label for="p_w">חלון</label><select id="p_w">
+        <option value="90" ${pW==90?'selected':''}>3 חודשים</option>
+        <option value="180" ${pW==180?'selected':''}>6 חודשים</option>
+        <option value="365" ${pW==365?'selected':''}>12 חודשים</option></select></div>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="gen">הפק חבילה</button>
+      <button class="btn ghost" id="copy">העתק</button>
+      <button class="btn ghost" id="print">הדפס / PDF</button>
+    </div>
+    <div id="out"></div>`;
+  el('p_g').onchange = e=>{ pG=e.target.value; };
+  el('p_w').onchange = e=>{ pW=+e.target.value; };
+  el('gen').onclick = ()=>{ if(!pG) return toast('בחר מגדל'); el('out').innerHTML =
+    `<div class="pack" id="packtext">${esc(buildPack(pG,pW))}</div>`; };
+  el('copy').onclick = ()=>{ const t=el('packtext'); if(!t) return toast('הפק קודם');
+    navigator.clipboard.writeText(t.textContent).then(()=>toast('הועתק')); };
+  el('print').onclick = ()=>{ if(!el('packtext')) return toast('הפק קודם'); window.print(); };
+}
+
+function buildPack(gid, win){
+  const g = growers.find(x=>x.id===gid);
+  const from = new Date(today().getTime() - win*86400000);
+  const inWin = docs.filter(d=>d.grower_id===gid && d.sampled_on && parse(d.sampled_on) >= from)
+                    .sort((a,b)=>a.sampled_on.localeCompare(b.sampled_on));
+  const sec = k => inWin.filter(d=>d.kind===k);
+  const L = [];
+  L.push('SUPPLIER DOCUMENTATION PACK');
+  L.push(`Issued: ${fmtEn(iso(today()))}   ·   Period covered: last ${win} days, ${fmtEn(iso(from))} to ${fmtEn(iso(today()))}`);
+  L.push('');
+  L.push('1. GROWER');
+  L.push(`Name: ${g.name}`);
+  if(g.country) L.push(`Country of production: ${g.country}`);
+  if(g.ggn)     L.push(`GGN / GLN: ${g.ggn}`);
+  if(g.products)L.push(`Products: ${g.products}`);
+  if(g.markets) L.push(`Declared markets: ${g.markets}`);
+  L.push('');
+  L.push('2. CERTIFICATION');
+  if(g.cert_no){
+    L.push(`Standard: GLOBALG.A.P. Integrated Farm Assurance v6`);
+    L.push(`Certification body: ${g.cert_body||'—'}`);
+    L.push(`Certificate number: ${g.cert_no}`);
+    L.push(`Valid: ${fmtEn(g.cert_from)} to ${fmtEn(g.cert_to)}`);
+    const c = certState(g);
+    L.push(`Status at date of issue: ${c.s==='ok'?'Valid':c.s==='warn'?'Valid, expiring shortly':'EXPIRED — renewal in progress'}`);
+    L.push('Current status verifiable at https://www.globalgap.org/validate');
+  } else L.push('Certificate details not on file.');
+  L.push('');
+
+  const block = (num, title, kind) => {
+    L.push(`${num}. ${title.toUpperCase()}`);
+    const rows = sec(kind);
+    if(!rows.length){
+      L.push(`No analysis on file within the period stated above. Sampling is being arranged and results will be issued as an addendum to this pack.`);
+    } else {
+      rows.forEach(d=>{
+        L.push(`${fmtEn(d.sampled_on)} · ${d.product||'—'} · ${d.lab||'—'} · report ${d.ref_no||'—'} · ${RESULTS_EN[d.result]||d.result}`);
+        if(d.criterion) L.push(`    Assessed against: ${d.criterion}`);
+        if(d.notes)     L.push(`    Note: ${d.notes}`);
+      });
+    }
+    L.push('');
+  };
+  block(3,'Pesticide residue analysis','residue');
+  block(4,'Microbiological analysis','micro');
+  if(sec('water').length) block(5,'Water analysis','water');
+
+  L.push('6. PLANT PROTECTION PRODUCTS');
+  L.push('Permitted products follow the national lists of plant protection products approved for herbs intended for export, held per crop.');
+  L.push('Application records stating active substance, date, rate and pre-harvest interval are available on request per crop and per block.');
+  L.push('');
+  L.push('7. DOCUMENTS ENCLOSED');
+  inWin.forEach((d,i)=>L.push(`${i+1}. ${KINDS_EN[d.kind]||d.kind} — ${d.lab||''} ${d.ref_no||''} ${d.product?'('+d.product+')':''} ${fmtEn(d.reported_on||d.sampled_on)}`.replace(/\s+/g,' ')));
+  if(!inWin.length) L.push('No analytical reports fall within the period stated above.');
+  L.push('');
+  L.push('8. DECLARATION');
+  L.push('The documents listed above are true copies of the records held for this grower. Where a testing interval requested is not covered by an analysis on file, this is stated openly above rather than omitted.');
+  L.push('');
+  L.push('Prepared by: ______________________    Date: ______________________');
+  return L.join('\n');
+}
+
+/* ---------- יומן FDA ---------- */
+function vReg(){
+  el('main').innerHTML = `
+    <div class="btnrow"><button class="btn" id="add">רשומה חדשה</button></div>
+    ${reg.map(r=>`<div class="card"><div class="row">
+      <div class="stack">
+        <span class="name">${esc(r.title)}</span>
+        <span class="meta">${fmt(r.happened_on)} · ${esc(r.party||'')}</span>
+        ${r.ref_no?`<span class="meta">אסמכתא ${esc(r.ref_no)}</span>`:''}
+        ${r.items?`<span class="meta">${esc(r.items)}</span>`:''}
+        ${r.notes?`<span class="meta">${esc(r.notes)}</span>`:''}
+      </div>
+      <div class="stack" style="align-items:flex-start;gap:6px">
+        ${r.direction==='out' ? (r.ack
+          ? `<span class="pill p-ok">נקלט${r.ack_on?' '+fmt(r.ack_on):''}</span>`
+          : '<span class="pill p-bad">ללא אישור</span>') : ''}
+        <button class="btn sm ghost" data-r="${r.id}">ערוך</button>
+      </div>
+    </div></div>`).join('') || '<div class="empty">היומן ריק.</div>'}`;
+  el('add').onclick = ()=>editReg();
+  document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>editReg(b.dataset.r));
+}
+
+function editReg(id){
+  const r = id ? reg.find(x=>x.id===id) : {kind:'response', direction:'out', happened_on:iso(today())};
+  const K = {inspection:'ביקורת', form483:'Form 483', response:'הגשה ל-FDA', closure:'סגירת תיק',
+    notice:'הודעה מרשות', record:'רשומה פנימית', other:'אחר'};
+  const D = {out:'נשלח', in:'התקבל', int:'פנימי'};
+  open(`
+    <button class="close" onclick="window.__close()">×</button>
+    <h3>${id?'עריכת רשומה':'רשומה חדשה'}</h3>
+    <div class="grid2">
+      <div><label for="r_d">תאריך</label><input type="date" id="r_d" value="${esc(r.happened_on)}"></div>
+      <div><label for="r_k">סוג</label><select id="r_k">${Object.entries(K).map(([k,l])=>`<option value="${k}" ${r.kind===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <label for="r_dir">כיוון</label>
+    <select id="r_dir">${Object.entries(D).map(([k,l])=>`<option value="${k}" ${r.direction===k?'selected':''}>${l}</option>`).join('')}</select>
+    <label for="r_t">כותרת</label><input id="r_t" value="${esc(r.title)}">
+    <label for="r_te">Title (English)</label><input id="r_te" value="${esc(r.title_en)}">
+    <label for="r_p">גורם / איש קשר</label><input id="r_p" value="${esc(r.party)}">
+    <label for="r_ref">אסמכתא</label><input id="r_ref" value="${esc(r.ref_no)}">
+    <label for="r_i">פריטים בהגשה</label><textarea id="r_i">${esc(r.items)}</textarea>
+    <label for="r_a">אישור קליטה</label>
+    <select id="r_a"><option value="1" ${r.ack?'selected':''}>התקבל</option>
+      <option value="0" ${!r.ack?'selected':''}>לא התקבל</option></select>
+    <div class="grid2">
+      <div><label for="r_ao">תאריך האישור</label><input type="date" id="r_ao" value="${esc(r.ack_on)}"></div>
+      <div><label for="r_ar">אסמכתת האישור</label><input id="r_ar" value="${esc(r.ack_ref)}"></div>
+    </div>
+    <label for="r_ab">ממי התקבל</label><input id="r_ab" value="${esc(r.ack_by)}">
+    <label for="r_l">קישור</label><input id="r_l" value="${esc(r.link)}">
+    <label for="r_n">הערות</label><textarea id="r_n">${esc(r.notes)}</textarea>
+    <div class="btnrow">
+      <button class="btn" id="save">שמור</button>
+      ${id?'<button class="btn warn" id="del">מחק</button>':''}
+      <button class="btn ghost" onclick="window.__close()">ביטול</button>
+    </div>`);
+  el('save').onclick = async ()=>{
+    const v = x => el(x).value.trim() || null;
+    const rec = { happened_on:v('r_d'), kind:el('r_k').value, direction:el('r_dir').value,
+      title:v('r_t'), title_en:v('r_te'), party:v('r_p'), ref_no:v('r_ref'), items:v('r_i'),
+      ack:el('r_a').value==='1', ack_on:v('r_ao'), ack_by:v('r_ab'), ack_ref:v('r_ar'),
+      link:v('r_l'), notes:v('r_n') };
+    if(!rec.title) return toast('צריך כותרת');
+    const q = id ? sb.from('reg_log').update(rec).eq('id',id) : sb.from('reg_log').insert(rec);
+    const {error} = await q;
+    if(error) return toast('לא נשמר');
+    await loadAll(); close(); chrome(); toast('נשמר');
+  };
+  if(id) el('del').onclick = async ()=>{
+    if(!confirm('למחוק את הרשומה?')) return;
+    await sb.from('reg_log').delete().eq('id',id);
+    await loadAll(); close(); chrome(); toast('נמחק');
+  };
+}
+
+/* ---------- חלונית ---------- */
+function open(html){
+  const s = document.createElement('div');
+  s.className='sheet'; s.id='sheet';
+  s.innerHTML = `<div>${html}</div>`;
+  s.onclick = e => { if(e.target===s) close(); };
+  document.body.appendChild(s);
+}
+function close(){ const s=el('sheet'); if(s) s.remove(); }
+window.__close = close;
+
+/* ---------- התקנה והתחברות ---------- */
+function setupScreen(msg){
+  app.innerHTML = `<div class="setup">
+    <h1 style="font-size:20px;font-weight:500">חיבור למסד הנתונים</h1>
+    <p class="meta">מתוך Supabase: Project Settings ← API. מזינים פעם אחת במכשיר.</p>
+    ${msg?`<p class="meta" style="color:var(--brick)">${esc(msg)}</p>`:''}
+    <label for="s_url">Project URL</label><input id="s_url" value="${esc(cfg.url)}" placeholder="https://xxxx.supabase.co">
+    <label for="s_key">Anon public key</label><input id="s_key" value="${esc(cfg.key)}">
+    <div class="btnrow"><button class="btn" id="s_go">שמור והמשך</button></div>
+  </div>`;
+  el('s_go').onclick = ()=>{
+    const u=el('s_url').value.trim(), k=el('s_key').value.trim();
+    if(!u||!k) return toast('צריך שניהם');
+    localStorage.setItem('sb_url',u); localStorage.setItem('sb_key',k);
+    cfg.url=u; cfg.key=k; boot();
+  };
+}
+
+async function start(){ await loadAll(); chrome(); }
+
+async function boot(){
+  if(!cfg.url || !cfg.key) return setupScreen();
+  try { sb = createClient(cfg.url, cfg.key); }
+  catch(e){ return setupScreen('כתובת או מפתח לא תקינים'); }
+  start();
+}
+boot();
+</script>
+</body>
+</html>DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
