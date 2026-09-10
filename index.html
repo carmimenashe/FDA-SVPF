@@ -111,6 +111,12 @@ const days = (a,b) => Math.round((a-b)/86400000);
 function fmt(s){ if(!s) return '—'; const d=parse(s); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
 function fmtEn(s){ if(!s) return '—'; const d=parse(s);
   return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+const signer = () => localStorage.getItem('signer') || '';
+function setSigner(){
+  const v = prompt('שם החותם, כפי שיופיע ברשומות (באנגלית):', signer());
+  if(v!==null){ localStorage.setItem('signer', v.trim()); toast('נשמר'); }
+}
+window.__setSigner = setSigner;
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
   document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
 
@@ -212,6 +218,7 @@ function vStatus(){
       </div></div>`;
     }).join('')}
     <div class="btnrow no-print" style="margin-top:20px">
+      <button class="btn ghost sm" onclick="window.__setSigner()">שם החותם</button>
       <button class="btn ghost sm" onclick="window.__resetCfg()">שינוי חיבור</button>
     </div>`;
 }
@@ -322,6 +329,7 @@ function vDocs(){
         <div class="stack" style="align-items:flex-start;gap:6px">
           <span class="pill ${p}">${esc(RESULTS[d.result]||d.result)}</span>
           <button class="btn sm ghost" data-d="${d.id}">ערוך</button>
+          <button class="btn sm ghost" data-rev="${d.id}">רשומת סקירה</button>
         </div>
       </div></div>`;
     }).join('') || '<div class="empty">אין מסמכים בסינון הזה.</div>'}</div>`;
@@ -329,6 +337,76 @@ function vDocs(){
   el('f_k').onchange = e=>{ fK=e.target.value; vDocs(); };
   el('add').onclick = ()=>editDoc();
   document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>editDoc(b.dataset.d));
+  document.querySelectorAll('[data-rev]').forEach(b=>b.onclick=()=>reviewDoc(b.dataset.rev));
+}
+
+/* ---------- רשומת סקירה (Record Review) ---------- */
+function buildReview(d){
+  const g = growers.find(x=>x.id===d.grower_id) || {};
+  const L=[];
+  L.push('FSVP / SUPPLIER RECORD REVIEW & ASSESSMENT');
+  L.push('');
+  L.push('SUPPLIER');
+  L.push(g.name || '—');
+  if(g.country || g.ggn) L.push([g.country, g.ggn?('GGN '+g.ggn):null].filter(Boolean).join(' · '));
+  L.push('');
+  L.push('DOCUMENT REVIEWED');
+  L.push(`${KINDS_EN[d.kind]||d.kind} — ${[d.lab, d.ref_no].filter(Boolean).join(' ')}`);
+  if(d.product)     L.push(`Product: ${d.product}`);
+  if(d.sampled_on)  L.push(`Date sampled: ${fmtEn(d.sampled_on)}`);
+  if(d.reported_on) L.push(`Date of report: ${fmtEn(d.reported_on)}`);
+  if(d.received_on) L.push(`Date received: ${fmtEn(d.received_on)}`);
+  if(d.link)        L.push(`Source document: ${d.link}`);
+  L.push('');
+  L.push('FINDINGS');
+  L.push(`Outcome: ${RESULTS_EN[d.result]||d.result}`);
+  if(d.criterion) L.push(`Assessed against: ${d.criterion}`);
+  if(g.cert_no && d.sampled_on){
+    const inWin = g.cert_from && g.cert_to &&
+      parse(d.sampled_on) >= parse(g.cert_from) && parse(d.sampled_on) <= parse(g.cert_to);
+    L.push(`Certificate ${g.cert_no} valid ${fmtEn(g.cert_from)} to ${fmtEn(g.cert_to)}. Sampling date ${inWin?'falls within':'DOES NOT fall within'} the certificate validity period.`);
+  }
+  L.push('');
+  L.push('LIMITATIONS NOTED');
+  L.push(d.notes ? d.notes : 'None recorded.');
+  L.push('');
+  L.push('DETERMINATION');
+  L.push(d.result==='pass' ? 'Accepted as evidence of supplier control for the parameter tested.'
+       : d.result==='pass_qualified' ? 'Accepted as supporting evidence only, subject to the limitations stated above. Not sufficient on its own.'
+       : d.result==='fail' ? 'NOT ACCEPTED. Corrective action required and the supplier is suspended for the affected food pending resolution.'
+       : 'Pending.');
+  L.push('');
+  L.push('REVIEWED AND SIGNED');
+  L.push(`Name: ${d.reviewed_by || '______________________'}`);
+  L.push(`Date of review: ${d.reviewed_on ? fmtEn(d.reviewed_on) : '______________________'}`);
+  L.push('');
+  L.push('Electronic record maintained under 21 CFR 1.510(a); records established to satisfy subpart L are exempt from 21 CFR part 11 under 1.510(d).');
+  return L.join('\n');
+}
+
+function reviewDoc(id){
+  const d = docs.find(x=>x.id===id); if(!d) return;
+  open(`
+    <button class="close" onclick="window.__close()">×</button>
+    <h3>רשומת סקירה</h3>
+    <p class="meta">${d.reviewed_on ? 'נחתמה '+fmt(d.reviewed_on)+(d.reviewed_by?' · '+esc(d.reviewed_by):'') : 'טרם נחתמה. קרא, ואז חתום.'}</p>
+    <div class="pack" id="revtext">${esc(buildReview(d))}</div>
+    <div class="btnrow">
+      ${d.reviewed_on?'':'<button class="btn" id="sign">חתום היום</button>'}
+      <button class="btn ghost" id="cp">העתק</button>
+      <button class="btn ghost" onclick="window.print()">הדפס / PDF</button>
+      <button class="btn ghost" onclick="window.__close()">סגור</button>
+    </div>`);
+  el('cp').onclick = ()=>navigator.clipboard.writeText(el('revtext').textContent).then(()=>toast('הועתק'));
+  const sg = el('sign');
+  if(sg) sg.onclick = async ()=>{
+    let who = signer();
+    if(!who){ who = prompt('שם החותם (באנגלית):','') || ''; if(!who.trim()) return; localStorage.setItem('signer', who.trim()); who = who.trim(); }
+    const {error} = await sb.from('documents')
+      .update({reviewed_on: iso(today()), reviewed_by: who}).eq('id', d.id);
+    if(error) return toast('לא נשמר');
+    await loadAll(); close(); chrome(); toast('נחתם');
+  };
 }
 
 function editDoc(id){
