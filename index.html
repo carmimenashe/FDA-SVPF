@@ -242,11 +242,60 @@ function vGrowers(){
         <div class="stack" style="align-items:flex-start;gap:6px">
           <span class="pill p-${c.s==='ok'?'ok':c.s==='warn'?'warn':'bad'}">${esc(fmt(g.cert_to))}</span>
           <button class="btn sm ghost" data-g="${g.id}">ערוך</button>
+          ${g.email?`<button class="btn sm ghost" data-mail="${g.id}">מייל</button>`:''}
+          ${g.phone?`<button class="btn sm ghost" data-wa="${g.id}">וואטסאפ</button>`:''}
         </div>
       </div></div>`;
     }).join('') || '<div class="empty">אין מגדלים.</div>'}`;
   el('add').onclick = ()=>editGrower();
   document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>editGrower(b.dataset.g));
+  document.querySelectorAll('[data-mail]').forEach(b=>b.onclick=()=>mailGrower(b.dataset.mail));
+  document.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>waGrower(b.dataset.wa));
+}
+
+/* ---------- בניית בקשה לפי מצב המגדל ---------- */
+function requestParts(g){
+  const c = certState(g), r = testState(g,'residue'), m = testState(g,'micro');
+  const he = (g.country||'').indexOf('ישראל')===0;
+  const need = [];
+  if(c.s!=='ok') need.push(he?'תעודת GLOBALG.A.P. בתוקף — התעודה שבידינו פגה'
+                           :'A current GLOBALG.A.P. certificate — the one we hold has expired');
+  if(r.s!=='ok') need.push(he?'בדיקת שאריות הדברה עדכנית'
+                           :'A current pesticide residue analysis, assessed against Regulation (EC) No 396/2005');
+  if(m.s!=='ok') need.push(he?'בדיקה מיקרוביולוגית עדכנית — E. coli וסלמונלה'
+                           :'A current microbiological analysis for Escherichia coli and Salmonella');
+  if(!need.length) need.push(he?'עדכון מסמכים שוטף':'Updated documentation for our supplier file');
+  return {he, need};
+}
+
+/* ---------- פתיחת מייל מוכן ---------- */
+function mailGrower(id){
+  const g = growers.find(x=>x.id===id); if(!g||!g.email) return;
+  const {he, need} = requestParts(g);
+  const subject = he ? 'בקשת מסמכים — ' + g.name : 'Supplier documentation request — ' + g.name;
+  const body = he
+    ? `שלום${g.contact?' '+g.contact:''},\n\nלצורך עמידה בדרישות לקוחותינו באירופה נבקש את המסמכים הבאים:\n\n`
+      + need.map((n,i)=>`${i+1}. ${n}`).join('\n')
+      + `\n\nGGN ${g.ggn||''}\n\nתודה,\nמנשה כרמי\nמנהל בקרת איכות, אגריוור חקלאות בע"מ`
+    : `Dear${g.contact?' '+g.contact:' Sir or Madam'},\n\nTo meet the requirements of our European customers we ask for the following:\n\n`
+      + need.map((n,i)=>`${i+1}. ${n}`).join('\n')
+      + `\n\nGGN ${g.ggn||''}\n\nKind regards,\nMenashe Carmi\nQuality Control Manager, Agriver Agriculture Ltd`;
+
+  window.location.href = 'mailto:' + encodeURIComponent(g.email)
+    + '?subject=' + encodeURIComponent(subject)
+    + '&body=' + encodeURIComponent(body);
+}
+
+/* ---------- פתיחת וואטסאפ מוכן ---------- */
+function waGrower(id){
+  const g = growers.find(x=>x.id===id); if(!g||!g.phone) return;
+  const {he, need} = requestParts(g);
+  const txt = he
+    ? `שלום${g.contact?' '+g.contact:''}, מדברים מאגריוור.\nלצורך דרישות לקוחותינו באירופה נבקש:\n`
+      + need.map((n,i)=>`${i+1}. ${n}`).join('\n') + `\nGGN ${g.ggn||''}\nתודה, מנשה כרמי`
+    : `Hello${g.contact?' '+g.contact:''}, this is Agriver.\nFor our European customers we need:\n`
+      + need.map((n,i)=>`${i+1}. ${n}`).join('\n') + `\nGGN ${g.ggn||''}\nThank you, Menashe Carmi`;
+  window.open('https://wa.me/' + g.phone + '?text=' + encodeURIComponent(txt), '_blank');
 }
 
 function editGrower(id){
@@ -267,6 +316,12 @@ function editGrower(id){
       <div><label for="g_from">תוקף מ-</label><input type="date" id="g_from" value="${esc(g.cert_from)}"></div>
       <div><label for="g_to">תוקף עד</label><input type="date" id="g_to" value="${esc(g.cert_to)}"></div>
     </div>
+    <div class="grid2">
+      <div><label for="g_contact">איש קשר</label><input id="g_contact" value="${esc(g.contact)}"></div>
+      <div><label for="g_email">אימייל</label><input type="email" id="g_email" value="${esc(g.email)}"></div>
+    </div>
+    <label for="g_phone">וואטסאפ — מספר בינלאומי, למשל 972501234567</label>
+    <input id="g_phone" value="${esc(g.phone)}" inputmode="tel">
     <label for="g_prod">מוצרים</label><input id="g_prod" value="${esc(g.products)}">
     <label for="g_mkt">שווקי יעד</label><input id="g_mkt" value="${esc(g.markets)}">
     <div class="grid2">
@@ -286,6 +341,7 @@ function editGrower(id){
     const v = x => el(x).value.trim() || null;
     const rec = { name:v('g_name'), country:v('g_country'), ggn:v('g_ggn'), cert_body:v('g_body'),
       cert_no:v('g_cert'), cert_from:v('g_from'), cert_to:v('g_to'), products:v('g_prod'),
+      contact:v('g_contact'), email:v('g_email'), phone:(v('g_phone')||'').replace(/[^0-9]/g,'')||null,
       markets:v('g_mkt'), residue_days:+el('g_rd').value||90, micro_days:+el('g_md').value||90,
       active:el('g_active').value==='1', notes:v('g_notes') };
     if(!rec.name) return toast('צריך שם');
@@ -467,30 +523,82 @@ function editDoc(id){
 }
 
 /* ---------- חבילת לקוח ---------- */
-let pG='', pW=90;
+let pG='ALL', pW=90, pF='all';
 function vPack(){
   el('main').innerHTML = `
     <div class="grid2">
-      <div><label for="p_g">מגדל</label><select id="p_g"><option value="">בחר</option>
-        ${growers.map(g=>`<option value="${g.id}" ${pG===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div>
-      <div><label for="p_w">חלון</label><select id="p_w">
+      <div><label for="p_g">מגדל</label><select id="p_g">
+        <option value="ALL" ${pG==='ALL'?'selected':''}>— כל המגדלים —</option>
+        ${growers.filter(g=>g.active!==false).map(g=>`<option value="${g.id}" ${pG===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}
+      </select></div>
+      <div><label for="p_w">חלון בדיקות</label><select id="p_w">
         <option value="90" ${pW==90?'selected':''}>3 חודשים</option>
         <option value="180" ${pW==180?'selected':''}>6 חודשים</option>
         <option value="365" ${pW==365?'selected':''}>12 חודשים</option></select></div>
     </div>
+    <label for="p_f">מה לכלול</label>
+    <select id="p_f">
+      <option value="all"   ${pF==='all'?'selected':''}>הכל — כולל פערים מוצהרים</option>
+      <option value="cert"  ${pF==='cert'?'selected':''}>רק מגדלים עם תעודה בתוקף</option>
+      <option value="tests" ${pF==='tests'?'selected':''}>רק מגדלים עם בדיקות בתוך החלון</option>
+    </select>
     <div class="btnrow">
-      <button class="btn" id="gen">הפק חבילה</button>
+      <button class="btn" id="gen">הפק</button>
       <button class="btn ghost" id="copy">העתק</button>
       <button class="btn ghost" id="print">הדפס / PDF</button>
     </div>
     <div id="out"></div>`;
   el('p_g').onchange = e=>{ pG=e.target.value; };
   el('p_w').onchange = e=>{ pW=+e.target.value; };
-  el('gen').onclick = ()=>{ if(!pG) return toast('בחר מגדל'); el('out').innerHTML =
-    `<div class="pack" id="packtext">${esc(buildPack(pG,pW))}</div>`; };
+  el('p_f').onchange = e=>{ pF=e.target.value; };
+  el('gen').onclick = ()=>{
+    if(!pG) return toast('בחר מגדל');
+    const txt = pG==='ALL' ? buildMatrix(pW,pF) : buildPack(pG,pW);
+    el('out').innerHTML = `<div class="pack" id="packtext">${esc(txt)}</div>`;
+  };
   el('copy').onclick = ()=>{ const t=el('packtext'); if(!t) return toast('הפק קודם');
     navigator.clipboard.writeText(t.textContent).then(()=>toast('הועתק')); };
   el('print').onclick = ()=>{ if(!el('packtext')) return toast('הפק קודם'); window.print(); };
+}
+
+/* ---------- מטריצת ספקים — כל המגדלים ---------- */
+function buildMatrix(win, filter){
+  const from = new Date(today().getTime() - win*86400000);
+  const certOk = g => g.cert_to && parse(g.cert_to) >= today();
+  const lastOf = (gid,k) => {
+    const r = docs.filter(d=>d.grower_id===gid && d.kind===k && d.sampled_on)
+                  .sort((a,b)=>b.sampled_on.localeCompare(a.sampled_on))[0];
+    return r && parse(r.sampled_on) >= from ? r : null;
+  };
+  let list = growers.filter(g=>g.active!==false);
+  if(filter==='cert')  list = list.filter(certOk);
+  if(filter==='tests') list = list.filter(g=>lastOf(g.id,'residue')||lastOf(g.id,'micro'));
+  list.sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
+
+  const L=[];
+  L.push('SUPPLIER ASSURANCE MATRIX');
+  L.push(`Issued: ${fmtEn(iso(today()))} · Analytical coverage shown for the last ${win} days`);
+  L.push(filter==='cert'  ? 'Scope: suppliers holding a certificate valid at the date of issue.'
+       : filter==='tests' ? 'Scope: suppliers with analysis on file within the period stated.'
+       : 'Scope: all active suppliers. Where no analysis is on file this is stated openly.');
+  L.push('');
+  let country = null;
+  list.forEach(g=>{
+    if(g.country !== country){ country = g.country; L.push(''); L.push((country||'').toUpperCase()); L.push(''); }
+    const bits = [g.name];
+    if(g.ggn)      bits.push('GGN '+g.ggn);
+    if(g.cert_body)bits.push(g.cert_body + (g.cert_no?' '+g.cert_no:''));
+    bits.push(certOk(g) ? 'valid to '+fmtEn(g.cert_to) : 'CERTIFICATE EXPIRED '+fmtEn(g.cert_to));
+    L.push(bits.join(' · '));
+    const r = lastOf(g.id,'residue'), m = lastOf(g.id,'micro');
+    L.push(`  Residue: ${r ? fmtEn(r.sampled_on)+(r.lab?' · '+r.lab:'')+(r.criterion?' · '+r.criterion:'') : 'none on file within the period'}`);
+    L.push(`  Micro:   ${m ? fmtEn(m.sampled_on)+(m.lab?' · '+m.lab:'') : 'none on file within the period'}`);
+  });
+  L.push('');
+  L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
+  L.push('');
+  L.push('Prepared by: ______________________    Date: ______________________');
+  return L.join('\n');
 }
 
 function buildPack(gid, win){
