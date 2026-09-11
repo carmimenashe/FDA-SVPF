@@ -96,7 +96,7 @@ const cfg = {
   key: BUILT_IN_KEY || localStorage.getItem('sb_key') || ''
 };
 let sb = null, session = null;
-let growers = [], docs = [], reg = [];
+let growers = [], docs = [], reg = [], settings = {};
 let view = 'status';
 const app = document.getElementById('app');
 
@@ -169,14 +169,27 @@ function alerts(){
 
 /* ---------- טעינה ---------- */
 async function loadAll(){
-  const [a,b,c] = await Promise.all([
+  const [a,b,c,e] = await Promise.all([
     sb.from('growers').select('*').order('name'),
     sb.from('documents').select('*').order('sampled_on',{ascending:false}),
-    sb.from('reg_log').select('*').order('happened_on',{ascending:false})
+    sb.from('reg_log').select('*').order('happened_on',{ascending:false}),
+    sb.from('settings').select('*')
   ]);
   if(a.error||b.error||c.error){ toast('שגיאה בטעינת הנתונים'); console.error(a.error||b.error||c.error); }
   growers = a.data||[]; docs = b.data||[]; reg = c.data||[];
+  settings = {}; (e.data||[]).forEach(r=>settings[r.key]=r.value);
 }
+const certsUrl = () => settings.certs_folder_url || '';
+async function setCertsUrl(){
+  const v = prompt('קישור לתיקיית התעודות המשותפת בדרייב:', certsUrl());
+  if(v===null) return;
+  const {error} = await sb.from('settings').upsert({key:'certs_folder_url', value:v.trim(), updated_at:new Date().toISOString()});
+  if(error) return toast('לא נשמר');
+  await loadAll(); chrome(); toast('נשמר');
+}
+window.__setCertsUrl = setCertsUrl;
+window.__copyCerts = ()=>{ const u=certsUrl(); if(!u) return toast('לא הוגדר קישור');
+  navigator.clipboard.writeText(u).then(()=>toast('הקישור הועתק')); };
 
 /* ---------- שלד ---------- */
 function chrome(){
@@ -217,6 +230,18 @@ function vStatus(){
         <div class="dots">${st.map(x=>`<span class="dot d-${x.s}" title="${esc(x.t)}"></span>`).join('')}</div>
       </div></div>`;
     }).join('')}
+    <h2>קישור לשיתוף עם לקוחות</h2>
+    <div class="card"><div class="stack">
+      ${certsUrl()
+        ? `<span class="meta">תיקיית התעודות המשותפת בדרייב</span>
+           <span class="meta" style="word-break:break-all">${esc(certsUrl())}</span>`
+        : '<span class="meta">טרם הוגדר קישור לתיקיית התעודות.</span>'}
+      <div class="btnrow" style="margin:8px 0 0">
+        <button class="btn sm" onclick="window.__copyCerts()">העתק קישור</button>
+        ${certsUrl()?`<a class="btn sm ghost" href="${esc(certsUrl())}" target="_blank" rel="noopener">פתח</a>`:''}
+        <button class="btn sm ghost" onclick="window.__setCertsUrl()">שנה</button>
+      </div>
+    </div></div>
     <div class="btnrow no-print" style="margin-top:20px">
       <button class="btn ghost sm" onclick="window.__setSigner()">שם החותם</button>
       <button class="btn ghost sm" onclick="window.__resetCfg()">שינוי חיבור</button>
@@ -596,6 +621,7 @@ function buildMatrix(win, filter){
   });
   L.push('');
   L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
+  if(certsUrl()){ L.push(''); L.push('Certificate documents: ' + certsUrl()); }
   L.push('');
   L.push('Prepared by: ______________________    Date: ______________________');
   return L.join('\n');
@@ -656,6 +682,7 @@ function buildPack(gid, win){
   inWin.forEach((d,i)=>L.push(`${i+1}. ${KINDS_EN[d.kind]||d.kind} — ${d.lab||''} ${d.ref_no||''} ${d.product?'('+d.product+')':''} ${fmtEn(d.reported_on||d.sampled_on)}`.replace(/\s+/g,' ')));
   if(!inWin.length) L.push('No analytical reports fall within the period stated above.');
   L.push('');
+  if(certsUrl()){ L.push('CERTIFICATE DOCUMENTS'); L.push(certsUrl()); L.push(''); }
   L.push('8. DECLARATION');
   L.push('The documents listed above are true copies of the records held for this grower. Where a testing interval requested is not covered by an analysis on file, this is stated openly above rather than omitted.');
   L.push('');
