@@ -98,6 +98,7 @@ const cfg = {
 let sb = null, session = null;
 let growers = [], docs = [], reg = [], settings = {};
 let view = 'status';
+const VIEW_ONLY = new URLSearchParams(location.search).has('view');
 const app = document.getElementById('app');
 
 /* ---------- עזר ---------- */
@@ -180,6 +181,13 @@ async function loadAll(){
   settings = {}; (e.data||[]).forEach(r=>settings[r.key]=r.value);
 }
 const certsUrl = () => settings.certs_folder_url || '';
+const labsUrl  = () => settings.labs_folder_url  || '';
+const pplUrl   = () => settings.ppl_folder_url   || '';
+window.__copyLink = (u)=>{ if(!u) return toast('לא הוגדר'); navigator.clipboard.writeText(u).then(()=>toast('הועתק')); };
+window.__copyAll = ()=>{
+  const t = ['Certificates: '+certsUrl(), 'Laboratory reports: '+labsUrl(), 'Plant protection product lists: '+pplUrl()].filter(x=>!x.endsWith(': ')).join('\n');
+  navigator.clipboard.writeText(t).then(()=>toast('שלושת הקישורים הועתקו'));
+};
 async function setCertsUrl(){
   const v = prompt('קישור לתיקיית התעודות המשותפת בדרייב:', certsUrl());
   if(v===null) return;
@@ -196,7 +204,7 @@ function chrome(){
   const tabs = [['status','מצב'],['growers','מגדלים'],['docs','מסמכים'],['pack','חבילת לקוח'],['reg','FDA']];
   app.innerHTML = `
   <header>
-    <div class="bar"><h1>תיק מגדלים</h1><span>${fmt(iso(today()))}</span></div>
+    <div class="bar"><h1>תיק מגדלים${VIEW_ONLY?' <span class="pill p-warn" style="vertical-align:middle">צפייה</span>':''}</h1><span>${fmt(iso(today()))}</span></div>
     <nav>${tabs.map(([k,l])=>`<button data-v="${k}" class="${view===k?'on':''}">${l}</button>`).join('')}</nav>
   </header>
   <main id="main"></main>`;
@@ -230,22 +238,24 @@ function vStatus(){
         <div class="dots">${st.map(x=>`<span class="dot d-${x.s}" title="${esc(x.t)}"></span>`).join('')}</div>
       </div></div>`;
     }).join('')}
-    <h2>קישור לשיתוף עם לקוחות</h2>
+    <h2>קישורים לשליחה ללקוחות</h2>
     <div class="card"><div class="stack">
-      ${certsUrl()
-        ? `<span class="meta">תיקיית התעודות המשותפת בדרייב</span>
-           <span class="meta" style="word-break:break-all">${esc(certsUrl())}</span>`
-        : '<span class="meta">טרם הוגדר קישור לתיקיית התעודות.</span>'}
-      <div class="btnrow" style="margin:8px 0 0">
-        <button class="btn sm" onclick="window.__copyCerts()">העתק קישור</button>
-        ${certsUrl()?`<a class="btn sm ghost" href="${esc(certsUrl())}" target="_blank" rel="noopener">פתח</a>`:''}
-        <button class="btn sm ghost" onclick="window.__setCertsUrl()">שנה</button>
+      ${[['תעודות',certsUrl()],['דוחות מעבדה',labsUrl()],['רשימות PPL',pplUrl()]].map(([l,u])=>`
+        <div class="row" style="align-items:center">
+          <span class="meta">${l}${u?'':' — לא הוגדר'}</span>
+          <div class="btnrow" style="margin:0">
+            <button class="btn sm ghost" onclick="window.__copyLink('${esc(u)}')">העתק</button>
+            ${u?`<a class="btn sm ghost" href="${esc(u)}" target="_blank" rel="noopener">פתח</a>`:''}
+          </div>
+        </div>`).join('')}
+      <div class="btnrow" style="margin:10px 0 0">
+        <button class="btn sm" onclick="window.__copyAll()">העתק את שלושתם למייל</button>
       </div>
     </div></div>
-    <div class="btnrow no-print" style="margin-top:20px">
+    ${VIEW_ONLY?'<p class="meta" style="margin-top:20px">מצב צפייה בלבד.</p>':`<div class="btnrow no-print" style="margin-top:20px">
       <button class="btn ghost sm" onclick="window.__setSigner()">שם החותם</button>
       <button class="btn ghost sm" onclick="window.__resetCfg()">שינוי חיבור</button>
-    </div>`;
+    </div>`}`;
 }
 window.__resetCfg = ()=>{
   if(!confirm('לנתק את החיבור למסד הנתונים במכשיר הזה?')) return;
@@ -255,7 +265,7 @@ window.__resetCfg = ()=>{
 /* ---------- מגדלים ---------- */
 function vGrowers(){
   el('main').innerHTML = `
-    <div class="btnrow"><button class="btn" id="add">מגדל חדש</button></div>
+    ${VIEW_ONLY?'':'<div class="btnrow"><button class="btn" id="add">מגדל חדש</button></div>'}
     ${growers.map(g=>{
       const c=certState(g);
       return `<div class="card"><div class="row">
@@ -266,13 +276,13 @@ function vGrowers(){
         </div>
         <div class="stack" style="align-items:flex-start;gap:6px">
           <span class="pill p-${c.s==='ok'?'ok':c.s==='warn'?'warn':'bad'}">${esc(fmt(g.cert_to))}</span>
-          <button class="btn sm ghost" data-g="${g.id}">ערוך</button>
+          ${VIEW_ONLY?'':`<button class="btn sm ghost" data-g="${g.id}">ערוך</button>`}
           ${g.email?`<button class="btn sm ghost" data-mail="${g.id}">מייל</button>`:''}
           ${g.phone?`<button class="btn sm ghost" data-wa="${g.id}">וואטסאפ</button>`:''}
         </div>
       </div></div>`;
     }).join('') || '<div class="empty">אין מגדלים.</div>'}`;
-  el('add').onclick = ()=>editGrower();
+  if(el('add')) el('add').onclick = ()=>editGrower();
   document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>editGrower(b.dataset.g));
   document.querySelectorAll('[data-mail]').forEach(b=>b.onclick=()=>mailGrower(b.dataset.mail));
   document.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>waGrower(b.dataset.wa));
@@ -387,7 +397,7 @@ let fG='', fK='';
 function vDocs(){
   const list = docs.filter(d=>(!fG||d.grower_id===fG)&&(!fK||d.kind===fK));
   el('main').innerHTML = `
-    <div class="btnrow"><button class="btn" id="add">מסמך חדש</button></div>
+    ${VIEW_ONLY?'':'<div class="btnrow"><button class="btn" id="add">מסמך חדש</button></div>'}
     <div class="grid2">
       <div><label for="f_g">מגדל</label><select id="f_g"><option value="">הכל</option>
         ${growers.map(g=>`<option value="${g.id}" ${fG===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select></div>
@@ -401,7 +411,9 @@ function vDocs(){
         <div class="stack">
           <span class="name">${esc(d.title)}</span>
           <span class="meta">${esc(g?g.name:'—')} · ${esc(KINDS[d.kind]||d.kind)}</span>
-          <span class="meta">נדגם ${fmt(d.sampled_on)}${d.reported_on?' · דוח '+fmt(d.reported_on):''}</span>
+          ${['cert','grasp'].includes(d.kind)||/BRC/i.test(d.title||'')
+            ? `<span class="meta">${d.reported_on?'הונפק '+fmt(d.reported_on):''}${d.expires_on?' · <b style="color:'+(parse(d.expires_on)<today()?'var(--brick)':'var(--ink)')+'">בתוקף עד '+fmt(d.expires_on)+(parse(d.expires_on)<today()?' — פג':'')+'</b>':''}</span>`
+            : `<span class="meta">נדגם ${fmt(d.sampled_on)}${d.reported_on?' · דוח '+fmt(d.reported_on):''}</span>`}
           ${d.criterion?`<span class="meta">מול ${esc(d.criterion)}</span>`:''}
           ${d.reviewed_on?`<span class="meta">נסקר ${fmt(d.reviewed_on)}${d.reviewed_by?' · '+esc(d.reviewed_by):''}</span>`:''}
           ${d.notes?`<span class="meta">${esc(d.notes)}</span>`:''}
@@ -409,14 +421,14 @@ function vDocs(){
         </div>
         <div class="stack" style="align-items:flex-start;gap:6px">
           <span class="pill ${p}">${esc(RESULTS[d.result]||d.result)}</span>
-          <button class="btn sm ghost" data-d="${d.id}">ערוך</button>
+          ${VIEW_ONLY?'':`<button class="btn sm ghost" data-d="${d.id}">ערוך</button>`}
           <button class="btn sm ghost" data-rev="${d.id}">רשומת סקירה</button>
         </div>
       </div></div>`;
     }).join('') || '<div class="empty">אין מסמכים בסינון הזה.</div>'}</div>`;
   el('f_g').onchange = e=>{ fG=e.target.value; vDocs(); };
   el('f_k').onchange = e=>{ fK=e.target.value; vDocs(); };
-  el('add').onclick = ()=>editDoc();
+  if(el('add')) el('add').onclick = ()=>editDoc();
   document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>editDoc(b.dataset.d));
   document.querySelectorAll('[data-rev]').forEach(b=>b.onclick=()=>reviewDoc(b.dataset.rev));
 }
@@ -473,7 +485,7 @@ function reviewDoc(id){
     <p class="meta">${d.reviewed_on ? 'נחתמה '+fmt(d.reviewed_on)+(d.reviewed_by?' · '+esc(d.reviewed_by):'') : 'טרם נחתמה. קרא, ואז חתום.'}</p>
     <div class="pack" id="revtext">${esc(buildReview(d))}</div>
     <div class="btnrow">
-      ${d.reviewed_on?'':'<button class="btn" id="sign">חתום היום</button>'}
+      ${(d.reviewed_on||VIEW_ONLY)?'':'<button class="btn" id="sign">חתום היום</button>'}
       <button class="btn ghost" id="cp">העתק</button>
       <button class="btn ghost" onclick="window.print()">הדפס / PDF</button>
       <button class="btn ghost" onclick="window.__close()">סגור</button>
@@ -548,152 +560,130 @@ function editDoc(id){
 }
 
 /* ---------- חבילת לקוח ---------- */
-let pG='ALL', pW=90, pF='all';
+let pSel = new Set(), pW = 180, pKinds = new Set(['residue','micro','cert','grasp']), pFmt = 'short';
+
 function vPack(){
+  const active = growers.filter(g=>g.active!==false).sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
+  if(!pSel.size) active.forEach(g=>pSel.add(g.id));
+  const KOPTS = [['residue','שאריות'],['micro','מיקרוביולוגיה'],['water','מים'],['cert','תעודות'],['grasp','GRASP'],['audit','מבדקים'],['ppl','PPL']];
   el('main').innerHTML = `
+    <h2>מגדלים</h2>
+    <div class="btnrow" style="margin-top:0">
+      <button class="btn sm ghost" id="selall">סמן הכל</button>
+      <button class="btn sm ghost" id="selnone">נקה</button>
+      <span class="meta" id="selcount"></span>
+    </div>
+    <div class="card" style="max-height:260px;overflow:auto;padding:6px 14px">
+      ${active.map(g=>`<label class="check" style="margin:0;padding:6px 0;border-bottom:1px solid var(--line)">
+        <input type="checkbox" data-sel="${g.id}" ${pSel.has(g.id)?'checked':''}>
+        <span>${esc(g.name)} <span class="meta">· ${esc(g.country||'')}</span></span></label>`).join('')}
+    </div>
+    <h2>מה לכלול</h2>
+    <div class="card" style="padding:6px 14px">
+      ${KOPTS.map(([k,l])=>`<label class="check" style="display:inline-flex;margin:4px 12px 4px 0"><input type="checkbox" data-kind="${k}" ${pKinds.has(k)?'checked':''}> <span>${l}</span></label>`).join('')}
+    </div>
     <div class="grid2">
-      <div><label for="p_g">מגדל</label><select id="p_g">
-        <option value="ALL" ${pG==='ALL'?'selected':''}>— כל המגדלים —</option>
-        ${growers.filter(g=>g.active!==false).map(g=>`<option value="${g.id}" ${pG===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}
-      </select></div>
       <div><label for="p_w">חלון בדיקות</label><select id="p_w">
         <option value="90" ${pW==90?'selected':''}>3 חודשים</option>
         <option value="180" ${pW==180?'selected':''}>6 חודשים</option>
         <option value="365" ${pW==365?'selected':''}>12 חודשים</option></select></div>
+      <div><label for="p_f">פורמט</label><select id="p_f">
+        <option value="short" ${pFmt==='short'?'selected':''}>קצר — למייל</option>
+        <option value="full" ${pFmt==='full'?'selected':''}>מלא — לשאלון או מבדק</option></select></div>
     </div>
-    <label for="p_f">מה לכלול</label>
-    <select id="p_f">
-      <option value="all"   ${pF==='all'?'selected':''}>הכל — כולל פערים מוצהרים</option>
-      <option value="cert"  ${pF==='cert'?'selected':''}>רק מגדלים עם תעודה בתוקף</option>
-      <option value="tests" ${pF==='tests'?'selected':''}>רק מגדלים עם בדיקות בתוך החלון</option>
-    </select>
     <div class="btnrow">
       <button class="btn" id="gen">הפק</button>
       <button class="btn ghost" id="copy">העתק</button>
       <button class="btn ghost" id="print">הדפס / PDF</button>
     </div>
     <div id="out"></div>`;
-  el('p_g').onchange = e=>{ pG=e.target.value; };
+  const cnt = ()=>{ el('selcount').textContent = pSel.size + ' נבחרו'; };
+  cnt();
+  document.querySelectorAll('[data-sel]').forEach(c=>c.onchange=()=>{ c.checked?pSel.add(c.dataset.sel):pSel.delete(c.dataset.sel); cnt(); });
+  document.querySelectorAll('[data-kind]').forEach(c=>c.onchange=()=>{ c.checked?pKinds.add(c.dataset.kind):pKinds.delete(c.dataset.kind); });
+  el('selall').onclick = ()=>{ active.forEach(g=>pSel.add(g.id)); vPack(); };
+  el('selnone').onclick = ()=>{ pSel.clear(); vPack(); };
   el('p_w').onchange = e=>{ pW=+e.target.value; };
-  el('p_f').onchange = e=>{ pF=e.target.value; };
+  el('p_f').onchange = e=>{ pFmt=e.target.value; };
   el('gen').onclick = ()=>{
-    if(!pG) return toast('בחר מגדל');
-    const txt = pG==='ALL' ? buildMatrix(pW,pF) : buildPack(pG,pW);
-    el('out').innerHTML = `<div class="pack" id="packtext">${esc(txt)}</div>`;
+    if(!pSel.size) return toast('בחר לפחות מגדל אחד');
+    el('out').innerHTML = `<div class="pack" id="packtext">${esc(buildPack([...pSel], pW, [...pKinds], pFmt))}</div>`;
   };
   el('copy').onclick = ()=>{ const t=el('packtext'); if(!t) return toast('הפק קודם');
     navigator.clipboard.writeText(t.textContent).then(()=>toast('הועתק')); };
   el('print').onclick = ()=>{ if(!el('packtext')) return toast('הפק קודם'); window.print(); };
 }
 
-/* ---------- מטריצת ספקים — כל המגדלים ---------- */
-function buildMatrix(win, filter){
+const COUNTRY_EN = {'ישראל':'ISRAEL','קניה':'KENYA','אתיופיה':'ETHIOPIA','רשות פלסטינית':'PALESTINIAN TERRITORIES','לא ידוע':'OTHER'};
+function buildPack(ids, win, kinds, fmt){
   const from = new Date(today().getTime() - win*86400000);
+  const list = growers.filter(g=>ids.includes(g.id))
+    .sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
   const certOk = g => g.cert_to && parse(g.cert_to) >= today();
-  const lastOf = (gid,k) => {
-    const r = docs.filter(d=>d.grower_id===gid && d.kind===k && d.sampled_on)
-                  .sort((a,b)=>b.sampled_on.localeCompare(a.sampled_on))[0];
-    return r && parse(r.sampled_on) >= from ? r : null;
-  };
-  let list = growers.filter(g=>g.active!==false);
-  if(filter==='cert')  list = list.filter(certOk);
-  if(filter==='tests') list = list.filter(g=>lastOf(g.id,'residue')||lastOf(g.id,'micro'));
-  list.sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
-
+  const inWin = (gid,k) => docs.filter(d=>d.grower_id===gid && d.kind===k && d.sampled_on && parse(d.sampled_on)>=from)
+                               .sort((a,b)=>b.sampled_on.localeCompare(a.sampled_on));
+  const held = (gid,k) => docs.filter(d=>d.grower_id===gid && d.kind===k)
+                              .sort((a,b)=>(b.reported_on||'').localeCompare(a.reported_on||''));
+  const want = k => kinds.includes(k);
   const L=[];
-  L.push('SUPPLIER ASSURANCE MATRIX');
-  L.push(`Issued: ${fmtEn(iso(today()))} · Analytical coverage shown for the last ${win} days`);
-  L.push(filter==='cert'  ? 'Scope: suppliers holding a certificate valid at the date of issue.'
-       : filter==='tests' ? 'Scope: suppliers with analysis on file within the period stated.'
-       : 'Scope: all active suppliers. Where no analysis is on file this is stated openly.');
+  const single = list.length===1;
+
+  L.push(single ? 'SUPPLIER DOCUMENTATION PACK' : 'SUPPLIER ASSURANCE SUMMARY');
+  L.push(`Issued: ${fmtEn(iso(today()))} · Analytical coverage: last ${win} days`);
   L.push('');
-  let country = null;
+
+  let country=null;
   list.forEach(g=>{
-    if(g.country !== country){ country = g.country; L.push(''); L.push((country||'').toUpperCase()); L.push(''); }
-    const bits = [g.name];
-    if(g.ggn)      bits.push('GGN '+g.ggn);
-    if(g.cert_body)bits.push(g.cert_body + (g.cert_no?' '+g.cert_no:''));
-    bits.push(certOk(g) ? 'valid to '+fmtEn(g.cert_to) : 'CERTIFICATE EXPIRED '+fmtEn(g.cert_to));
-    L.push(bits.join(' · '));
-    const r = lastOf(g.id,'residue'), m = lastOf(g.id,'micro');
-    L.push(`  Residue: ${r ? fmtEn(r.sampled_on)+(r.lab?' · '+r.lab:'')+(r.criterion?' · '+r.criterion:'') : 'none on file within the period'}`);
-    L.push(`  Micro:   ${m ? fmtEn(m.sampled_on)+(m.lab?' · '+m.lab:'') : 'none on file within the period'}`);
-  });
-  L.push('');
-  L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
-  if(certsUrl()){ L.push(''); L.push('Certificate documents: ' + certsUrl()); }
-  L.push('');
-  L.push('Prepared by: ______________________    Date: ______________________');
-  return L.join('\n');
-}
-
-function buildPack(gid, win){
-  const g = growers.find(x=>x.id===gid);
-  const from = new Date(today().getTime() - win*86400000);
-  const inWin = docs.filter(d=>d.grower_id===gid && d.sampled_on && parse(d.sampled_on) >= from)
-                    .sort((a,b)=>a.sampled_on.localeCompare(b.sampled_on));
-  const sec = k => inWin.filter(d=>d.kind===k);
-  const L = [];
-  L.push('SUPPLIER DOCUMENTATION PACK');
-  L.push(`Issued: ${fmtEn(iso(today()))}   ·   Period covered: last ${win} days, ${fmtEn(iso(from))} to ${fmtEn(iso(today()))}`);
-  L.push('');
-  L.push('1. GROWER');
-  L.push(`Name: ${g.name}`);
-  if(g.country) L.push(`Country of production: ${g.country}`);
-  if(g.ggn)     L.push(`GGN / GLN: ${g.ggn}`);
-  if(g.products)L.push(`Products: ${g.products}`);
-  if(g.markets) L.push(`Declared markets: ${g.markets}`);
-  L.push('');
-  L.push('2. CERTIFICATION');
-  if(g.cert_no){
-    L.push(`Standard: GLOBALG.A.P. Integrated Farm Assurance v6`);
-    L.push(`Certification body: ${g.cert_body||'—'}`);
-    L.push(`Certificate number: ${g.cert_no}`);
-    L.push(`Valid: ${fmtEn(g.cert_from)} to ${fmtEn(g.cert_to)}`);
-    const c = certState(g);
-    L.push(`Status at date of issue: ${c.s==='ok'?'Valid':c.s==='warn'?'Valid, expiring shortly':'EXPIRED — renewal in progress'}`);
-    L.push('Current status verifiable at https://www.globalgap.org/validate');
-  } else L.push('Certificate details not on file.');
-  L.push('');
-
-  const block = (num, title, kind) => {
-    L.push(`${num}. ${title.toUpperCase()}`);
-    const rows = sec(kind);
-    if(!rows.length){
-      L.push(`No analysis on file within the period stated above. Sampling is being arranged and results will be issued as an addendum to this pack.`);
-    } else {
-      rows.forEach(d=>{
-        L.push(`${fmtEn(d.sampled_on)} · ${d.product||'—'} · ${d.lab||'—'} · report ${d.ref_no||'—'} · ${RESULTS_EN[d.result]||d.result}`);
-        if(d.criterion) L.push(`    Assessed against: ${d.criterion}`);
-        if(d.notes)     L.push(`    Note: ${d.notes}`);
-      });
+    if(!single && g.country!==country){ country=g.country; L.push(COUNTRY_EN[country] || (country||'OTHER').toUpperCase()); }
+    const head=[g.name]; if(g.ggn) head.push('GGN '+g.ggn);
+    if(want('cert')){
+      if(g.cert_no||g.cert_to){
+        head.push((g.cert_body?g.cert_body+' ':'')+(g.cert_no||''));
+        head.push(certOk(g)?'certificate valid to '+fmtEn(g.cert_to):'CERTIFICATE EXPIRED '+fmtEn(g.cert_to));
+      } else head.push('certificate details not on file');
     }
-    L.push('');
-  };
-  block(3,'Pesticide residue analysis','residue');
-  block(4,'Microbiological analysis','micro');
-  if(sec('water').length) block(5,'Water analysis','water');
+    L.push(head.join(' · '));
+    if(fmt==='full' && g.products) L.push(`  Products: ${g.products}`);
+    if(fmt==='full' && g.markets)  L.push(`  Declared markets: ${g.markets}`);
 
-  L.push('6. PLANT PROTECTION PRODUCTS');
-  L.push('Permitted products follow the national lists of plant protection products approved for herbs intended for export, held per crop.');
-  L.push('Application records stating active substance, date, rate and pre-harvest interval are available on request per crop and per block.');
-  L.push('');
-  L.push('7. DOCUMENTS ENCLOSED');
-  inWin.forEach((d,i)=>L.push(`${i+1}. ${KINDS_EN[d.kind]||d.kind} — ${d.lab||''} ${d.ref_no||''} ${d.product?'('+d.product+')':''} ${fmtEn(d.reported_on||d.sampled_on)}`.replace(/\s+/g,' ')));
-  if(!inWin.length) L.push('No analytical reports fall within the period stated above.');
-  L.push('');
-  if(certsUrl()){ L.push('CERTIFICATE DOCUMENTS'); L.push(certsUrl()); L.push(''); }
-  L.push('8. DECLARATION');
-  L.push('The documents listed above are true copies of the records held for this grower. Where a testing interval requested is not covered by an analysis on file, this is stated openly above rather than omitted.');
-  L.push('');
-  L.push('Prepared by: ______________________    Date: ______________________');
+    if(want('grasp')){ const gr=held(g.id,'grasp')[0]; if(gr) L.push(`  GRASP: ${gr.ref_no||''}${gr.expires_on?' · valid to '+fmtEn(gr.expires_on):''}`); }
+    const brc = docs.find(d=>d.grower_id===g.id && /BRC/i.test(d.title||''));
+    if(want('cert') && brc) L.push(`  BRCGS: ${brc.ref_no||''}${brc.expires_on?' · valid to '+fmtEn(brc.expires_on):''}${/AA\+/.test(brc.notes||'')?' · grade AA+':''}`);
+
+    const block=(k,label)=>{
+      if(!want(k)) return;
+      const rows=inWin(g.id,k);
+      if(!rows.length){ L.push(`  ${label}: none on file within the period`); return; }
+      if(fmt==='short'){ const r=rows[0]; L.push(`  ${label}: ${fmtEn(r.sampled_on)}${r.lab?' · '+r.lab:''}${r.criterion?' · '+r.criterion:''}${rows.length>1?' (+'+(rows.length-1)+' more)':''}`); }
+      else rows.forEach(r=>{ L.push(`  ${label}: ${fmtEn(r.sampled_on)} · ${r.product||'—'} · ${r.lab||'—'} · ${r.ref_no||''} · ${RESULTS_EN[r.result]||r.result}`);
+                             if(r.criterion) L.push(`    Assessed against: ${r.criterion}`);
+                             if(r.notes) L.push(`    Note: ${r.notes}`); });
+    };
+    block('residue','Residue'); block('micro','Micro'); block('water','Water');
+    if(want('audit') && fmt==='full'){ const a=held(g.id,'audit')[0]; if(a) L.push(`  Audit: ${fmtEn(a.reported_on)} · ${a.lab||''} · ${a.ref_no||''}${a.notes?' · '+a.notes:''}`); }
+    L.push('');
+  });
+
+  const links=[];
+  if(want('cert')||want('grasp')) { if(certsUrl()) links.push('Certificates: '+certsUrl()); }
+  if(want('residue')||want('micro')||want('water')) { if(labsUrl()) links.push('Laboratory reports: '+labsUrl()); }
+  if(want('ppl')) { if(pplUrl()) links.push('Plant protection product lists: '+pplUrl()); }
+  if(links.length){ L.push(''); links.forEach(x=>L.push(x)); }
+
+  if(fmt==='full'){
+    L.push(''); L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
+    L.push(''); L.push('DECLARATION'); L.push('The documents referenced above are true copies of the records held for these suppliers. Where a testing interval requested is not covered by an analysis on file, this is stated openly rather than omitted.');
+    L.push(''); L.push('Prepared by: ______________________    Date: ______________________');
+  } else {
+    L.push(''); L.push('Certification status verifiable by GGN at https://www.globalgap.org/validate');
+  }
   return L.join('\n');
 }
 
 /* ---------- יומן FDA ---------- */
 function vReg(){
   el('main').innerHTML = `
-    <div class="btnrow"><button class="btn" id="add">רשומה חדשה</button></div>
+    ${VIEW_ONLY?'':'<div class="btnrow"><button class="btn" id="add">רשומה חדשה</button></div>'}
     ${reg.map(r=>`<div class="card"><div class="row">
       <div class="stack">
         <span class="name">${esc(r.title)}</span>
@@ -706,10 +696,10 @@ function vReg(){
         ${r.direction==='out' ? (r.ack
           ? `<span class="pill p-ok">נקלט${r.ack_on?' '+fmt(r.ack_on):''}</span>`
           : '<span class="pill p-bad">ללא אישור</span>') : ''}
-        <button class="btn sm ghost" data-r="${r.id}">ערוך</button>
+        ${VIEW_ONLY?'':`<button class="btn sm ghost" data-r="${r.id}">ערוך</button>`}
       </div>
     </div></div>`).join('') || '<div class="empty">היומן ריק.</div>'}`;
-  el('add').onclick = ()=>editReg();
+  if(el('add')) el('add').onclick = ()=>editReg();
   document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>editReg(b.dataset.r));
 }
 
