@@ -617,21 +617,46 @@ function vPack(){
 const COUNTRY_EN = {'ישראל':'ISRAEL','קניה':'KENYA','אתיופיה':'ETHIOPIA','רשות פלסטינית':'PALESTINIAN TERRITORIES','לא ידוע':'OTHER'};
 function buildPack(ids, win, kinds, fmt){
   const from = new Date(today().getTime() - win*86400000);
-  const list = growers.filter(g=>ids.includes(g.id))
-    .sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
   const certOk = g => g.cert_to && parse(g.cert_to) >= today();
   const inWin = (gid,k) => docs.filter(d=>d.grower_id===gid && d.kind===k && d.sampled_on && parse(d.sampled_on)>=from)
                                .sort((a,b)=>b.sampled_on.localeCompare(a.sampled_on));
   const held = (gid,k) => docs.filter(d=>d.grower_id===gid && d.kind===k)
                               .sort((a,b)=>(b.reported_on||'').localeCompare(a.reported_on||''));
   const want = k => kinds.includes(k);
+  const testKinds = ['residue','micro','water'].filter(want);
+
+  let list = growers.filter(g=>ids.includes(g.id));
+  // קצר: רק מי שעומד בתנאים — תעודה בתוקף, ובדיקה בחלון אם נבחרו בדיקות
+  if(fmt==='short'){
+    list = list.filter(g => (!want('cert') || certOk(g)) &&
+                            (!testKinds.length || testKinds.some(k=>inWin(g.id,k).length)));
+  }
+  list.sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
+
   const L=[];
   const single = list.length===1;
 
+  if(fmt==='short'){
+    list.forEach(g=>{
+      const parts=[g.name];
+      if(g.ggn) parts.push('GGN '+g.ggn);
+      if(want('cert') && g.cert_to) parts.push('cert. to '+fmtEn(g.cert_to));
+      testKinds.forEach(k=>{ const r=inWin(g.id,k)[0]; if(r) parts.push(({residue:'residue',micro:'micro',water:'water'})[k]+' '+fmtEn(r.sampled_on)); });
+      L.push(parts.join(' · '));
+    });
+    if(!list.length) L.push('No suppliers meet the selected criteria.');
+    const links=[];
+    if(want('cert')||want('grasp')) { if(certsUrl()) links.push('Certificates: '+certsUrl()); }
+    if(testKinds.length) { if(labsUrl()) links.push('Lab reports: '+labsUrl()); }
+    if(want('ppl')) { if(pplUrl()) links.push('PPL: '+pplUrl()); }
+    if(links.length){ L.push(''); links.forEach(x=>L.push(x)); }
+    return L.join('\n');
+  }
+
+  // מלא
   L.push(single ? 'SUPPLIER DOCUMENTATION PACK' : 'SUPPLIER ASSURANCE SUMMARY');
   L.push(`Issued: ${fmtEn(iso(today()))} · Analytical coverage: last ${win} days`);
   L.push('');
-
   let country=null;
   list.forEach(g=>{
     if(!single && g.country!==country){ country=g.country; L.push(COUNTRY_EN[country] || (country||'OTHER').toUpperCase()); }
@@ -643,40 +668,31 @@ function buildPack(ids, win, kinds, fmt){
       } else head.push('certificate details not on file');
     }
     L.push(head.join(' · '));
-    if(fmt==='full' && g.products) L.push(`  Products: ${g.products}`);
-    if(fmt==='full' && g.markets)  L.push(`  Declared markets: ${g.markets}`);
-
+    if(g.products) L.push(`  Products: ${g.products}`);
+    if(g.markets)  L.push(`  Declared markets: ${g.markets}`);
     if(want('grasp')){ const gr=held(g.id,'grasp')[0]; if(gr) L.push(`  GRASP: ${gr.ref_no||''}${gr.expires_on?' · valid to '+fmtEn(gr.expires_on):''}`); }
     const brc = docs.find(d=>d.grower_id===g.id && /BRC/i.test(d.title||''));
     if(want('cert') && brc) L.push(`  BRCGS: ${brc.ref_no||''}${brc.expires_on?' · valid to '+fmtEn(brc.expires_on):''}${/AA\+/.test(brc.notes||'')?' · grade AA+':''}`);
-
     const block=(k,label)=>{
       if(!want(k)) return;
       const rows=inWin(g.id,k);
       if(!rows.length){ L.push(`  ${label}: none on file within the period`); return; }
-      if(fmt==='short'){ const r=rows[0]; L.push(`  ${label}: ${fmtEn(r.sampled_on)}${r.lab?' · '+r.lab:''}${r.criterion?' · '+r.criterion:''}${rows.length>1?' (+'+(rows.length-1)+' more)':''}`); }
-      else rows.forEach(r=>{ L.push(`  ${label}: ${fmtEn(r.sampled_on)} · ${r.product||'—'} · ${r.lab||'—'} · ${r.ref_no||''} · ${RESULTS_EN[r.result]||r.result}`);
-                             if(r.criterion) L.push(`    Assessed against: ${r.criterion}`);
-                             if(r.notes) L.push(`    Note: ${r.notes}`); });
+      rows.forEach(r=>{ L.push(`  ${label}: ${fmtEn(r.sampled_on)} · ${r.product||'—'} · ${r.lab||'—'} · ${r.ref_no||''} · ${RESULTS_EN[r.result]||r.result}`);
+                        if(r.criterion) L.push(`    Assessed against: ${r.criterion}`);
+                        if(r.notes) L.push(`    Note: ${r.notes}`); });
     };
     block('residue','Residue'); block('micro','Micro'); block('water','Water');
-    if(want('audit') && fmt==='full'){ const a=held(g.id,'audit')[0]; if(a) L.push(`  Audit: ${fmtEn(a.reported_on)} · ${a.lab||''} · ${a.ref_no||''}${a.notes?' · '+a.notes:''}`); }
+    if(want('audit')){ const a=held(g.id,'audit')[0]; if(a) L.push(`  Audit: ${fmtEn(a.reported_on)} · ${a.lab||''} · ${a.ref_no||''}${a.notes?' · '+a.notes:''}`); }
     L.push('');
   });
-
   const links=[];
   if(want('cert')||want('grasp')) { if(certsUrl()) links.push('Certificates: '+certsUrl()); }
-  if(want('residue')||want('micro')||want('water')) { if(labsUrl()) links.push('Laboratory reports: '+labsUrl()); }
+  if(testKinds.length) { if(labsUrl()) links.push('Laboratory reports: '+labsUrl()); }
   if(want('ppl')) { if(pplUrl()) links.push('Plant protection product lists: '+pplUrl()); }
-  if(links.length){ L.push(''); links.forEach(x=>L.push(x)); }
-
-  if(fmt==='full'){
-    L.push(''); L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
-    L.push(''); L.push('DECLARATION'); L.push('The documents referenced above are true copies of the records held for these suppliers. Where a testing interval requested is not covered by an analysis on file, this is stated openly rather than omitted.');
-    L.push(''); L.push('Prepared by: ______________________    Date: ______________________');
-  } else {
-    L.push(''); L.push('Certification status verifiable by GGN at https://www.globalgap.org/validate');
-  }
+  if(links.length){ links.forEach(x=>L.push(x)); L.push(''); }
+  L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
+  L.push(''); L.push('DECLARATION'); L.push('The documents referenced above are true copies of the records held for these suppliers. Where a testing interval requested is not covered by an analysis on file, this is stated openly rather than omitted.');
+  L.push(''); L.push('Prepared by: ______________________    Date: ______________________');
   return L.join('\n');
 }
 
