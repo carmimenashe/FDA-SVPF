@@ -563,7 +563,7 @@ function editDoc(id){
 let pSel = new Set(), pW = 180, pKinds = new Set(['residue','micro','cert','grasp']), pFmt = 'short';
 
 function vPack(){
-  const active = growers.filter(g=>g.active!==false).sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
+  const active = growers.filter(g=>g.active!==false && !/chain of custody/i.test(g.name||'')).sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
   if(!pSel.size) active.forEach(g=>pSel.add(g.id));
   const KOPTS = [['residue','שאריות'],['micro','מיקרוביולוגיה'],['water','מים'],['cert','תעודות'],['grasp','GRASP'],['audit','מבדקים'],['ppl','PPL']];
   el('main').innerHTML = `
@@ -625,7 +625,7 @@ function buildPack(ids, win, kinds, fmt){
   const want = k => kinds.includes(k);
   const testKinds = ['residue','micro','water'].filter(want);
 
-  let list = growers.filter(g=>ids.includes(g.id));
+  let list = growers.filter(g=>ids.includes(g.id) && !/chain of custody/i.test(g.name||''));
   // קצר: רק מי שעומד בתנאים — תעודה בתוקף, ובדיקה בחלון אם נבחרו בדיקות
   if(fmt==='short'){
     list = list.filter(g => (!want('cert') || certOk(g)) &&
@@ -637,19 +637,13 @@ function buildPack(ids, win, kinds, fmt){
   const single = list.length===1;
 
   if(fmt==='short'){
-    list.forEach(g=>{
-      const parts=[g.name];
-      if(g.ggn) parts.push('GGN '+g.ggn);
-      if(want('cert') && g.cert_to) parts.push('cert. to '+fmtEn(g.cert_to));
-      testKinds.forEach(k=>{ const r=inWin(g.id,k)[0]; if(r) parts.push(({residue:'residue',micro:'micro',water:'water'})[k]+' '+fmtEn(r.sampled_on)); });
-      L.push(parts.join(' · '));
-    });
-    if(!list.length) L.push('No suppliers meet the selected criteria.');
     const links=[];
     if(want('cert')||want('grasp')) { if(certsUrl()) links.push('Certificates: '+certsUrl()); }
     if(testKinds.length) { if(labsUrl()) links.push('Lab reports: '+labsUrl()); }
-    if(want('ppl')) { if(pplUrl()) links.push('PPL: '+pplUrl()); }
-    if(links.length){ L.push(''); links.forEach(x=>L.push(x)); }
+    if(want('ppl')) { if(pplUrl()) links.push('Plant protection product lists: '+pplUrl()); }
+    L.push('As requested, please click the link' + (links.length>1?'s':'') + ' below:');
+    L.push('');
+    links.forEach(x=>L.push(x));
     return L.join('\n');
   }
 
