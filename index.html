@@ -183,6 +183,7 @@ async function loadAll(){
 const certsUrl = () => settings.certs_folder_url || '';
 const labsUrl  = () => settings.labs_folder_url  || '';
 const pplUrl   = () => settings.ppl_folder_url   || '';
+const sedexCo  = () => settings.sedex_company || '';
 window.__copyLink = (u)=>{ if(!u) return toast('לא הוגדר'); navigator.clipboard.writeText(u).then(()=>toast('הועתק')); };
 window.__copyAll = ()=>{
   const t = ['Certificates: '+certsUrl(), 'Laboratory reports: '+labsUrl(), 'Plant protection product lists: '+pplUrl()].filter(x=>!x.endsWith(': ')).join('\n');
@@ -273,6 +274,7 @@ function vGrowers(){
           <span class="name">${esc(g.name)}${g.active===false?' (לא פעיל)':''}</span>
           <span class="meta">${esc(g.country||'')}${g.ggn?' · GGN '+esc(g.ggn):''}</span>
           <span class="meta">${esc(g.products||'')}</span>
+          ${g.sedex_zs?`<span class="meta">Sedex ${esc(g.sedex_zs)}${g.sedex_saq?' · SAQ '+fmt(g.sedex_saq):''}</span>`:''}
         </div>
         <div class="stack" style="align-items:flex-start;gap:6px">
           <span class="pill p-${c.s==='ok'?'ok':c.s==='warn'?'warn':'bad'}">${esc(fmt(g.cert_to))}</span>
@@ -355,6 +357,10 @@ function editGrower(id){
       <div><label for="g_contact">איש קשר</label><input id="g_contact" value="${esc(g.contact)}"></div>
       <div><label for="g_email">אימייל</label><input type="email" id="g_email" value="${esc(g.email)}"></div>
     </div>
+    <div class="grid2">
+      <div><label for="g_sedex">Sedex ZS</label><input id="g_sedex" value="${esc(g.sedex_zs)}"></div>
+      <div><label for="g_saq">תאריך SAQ</label><input type="date" id="g_saq" value="${esc(g.sedex_saq)}"></div>
+    </div>
     <label for="g_phone">וואטסאפ — מספר בינלאומי, למשל 972501234567</label>
     <input id="g_phone" value="${esc(g.phone)}" inputmode="tel">
     <label for="g_prod">מוצרים</label><input id="g_prod" value="${esc(g.products)}">
@@ -376,7 +382,7 @@ function editGrower(id){
     const v = x => el(x).value.trim() || null;
     const rec = { name:v('g_name'), country:v('g_country'), ggn:v('g_ggn'), cert_body:v('g_body'),
       cert_no:v('g_cert'), cert_from:v('g_from'), cert_to:v('g_to'), products:v('g_prod'),
-      contact:v('g_contact'), email:v('g_email'), phone:(v('g_phone')||'').replace(/[^0-9]/g,'')||null,
+      contact:v('g_contact'), email:v('g_email'), sedex_zs:v('g_sedex'), sedex_saq:v('g_saq'), phone:(v('g_phone')||'').replace(/[^0-9]/g,'')||null,
       markets:v('g_mkt'), residue_days:+el('g_rd').value||90, micro_days:+el('g_md').value||90,
       active:el('g_active').value==='1', notes:v('g_notes') };
     if(!rec.name) return toast('צריך שם');
@@ -650,6 +656,7 @@ function buildPack(ids, win, kinds, fmt){
   // מלא
   L.push(single ? 'SUPPLIER DOCUMENTATION PACK' : 'SUPPLIER ASSURANCE SUMMARY');
   L.push(`Issued: ${fmtEn(iso(today()))} · Analytical coverage: last ${win} days`);
+  if(sedexCo()) L.push('Sedex: ' + sedexCo());
   L.push('');
   let country=null;
   list.forEach(g=>{
@@ -662,6 +669,7 @@ function buildPack(ids, win, kinds, fmt){
       } else head.push('certificate details not on file');
     }
     L.push(head.join(' · '));
+    if(g.sedex_zs) L.push(`  Sedex site: ${g.sedex_zs}${g.sedex_saq?' · SAQ completed '+fmtEn(g.sedex_saq):''}`);
     if(g.products) L.push(`  Products: ${g.products}`);
     if(g.markets)  L.push(`  Declared markets: ${g.markets}`);
     if(want('grasp')){ const gr=held(g.id,'grasp')[0]; if(gr) L.push(`  GRASP: ${gr.ref_no||''}${gr.expires_on?' · valid to '+fmtEn(gr.expires_on):''}`); }
