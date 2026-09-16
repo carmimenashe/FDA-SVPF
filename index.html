@@ -185,10 +185,11 @@ async function loadAll(){
 const certsUrl = () => settings.certs_folder_url || '';
 const labsUrl  = () => settings.labs_folder_url  || '';
 const pplUrl   = () => settings.ppl_folder_url   || '';
+const pplFarmUrl = () => settings.ppl_farm_folder_url || '';
 const sedexCo  = () => settings.sedex_company || '';
 window.__copyLink = (u)=>{ if(!u) return toast('לא הוגדר'); navigator.clipboard.writeText(u).then(()=>toast('הועתק')); };
 window.__copyAll = ()=>{
-  const t = ['Certificates: '+certsUrl(), 'Laboratory reports: '+labsUrl(), 'Plant protection product lists: '+pplUrl()].filter(x=>!x.endsWith(': ')).join('\n');
+  const t = ['Certificates: '+certsUrl(), 'Laboratory reports: '+labsUrl(), 'Plant protection product lists: '+pplUrl(), 'Grower pesticide lists: '+pplFarmUrl()].filter(x=>!x.endsWith(': ')).join('\n');
   navigator.clipboard.writeText(t).then(()=>toast('שלושת הקישורים הועתקו'));
 };
 async function setCertsUrl(){
@@ -243,7 +244,7 @@ function vStatus(){
     }).join('')}
     <h2>קישורים לשליחה ללקוחות</h2>
     <div class="card"><div class="stack">
-      ${[['תעודות',certsUrl()],['דוחות מעבדה',labsUrl()],['רשימות PPL',pplUrl()]].map(([l,u])=>`
+      ${[['תעודות',certsUrl()],['דוחות מעבדה',labsUrl()],['PPL רשמי',pplUrl()],['PPL של המגדל',pplFarmUrl()]].map(([l,u])=>`
         <div class="row" style="align-items:center">
           <span class="meta">${l}${u?'':' — לא הוגדר'}</span>
           <div class="btnrow" style="margin:0">
@@ -693,6 +694,7 @@ function buildPack(ids, win, kinds, fmt){
   if(want('cert')||want('grasp')) { if(certsUrl()) links.push('Certificates: '+certsUrl()); }
   if(testKinds.length) { if(labsUrl()) links.push('Laboratory reports: '+labsUrl()); }
   if(want('ppl')) { if(pplUrl()) links.push('Plant protection product lists: '+pplUrl()); }
+  if(want('ppl_farm')) { if(pplFarmUrl()) links.push('Grower pesticide lists: '+pplFarmUrl()); }
   if(links.length){ links.forEach(x=>L.push(x)); L.push(''); }
   L.push('Certification status is verified against the GLOBALG.A.P. Supply Chain Portal and is confirmable at https://www.globalgap.org/validate');
   L.push(''); L.push('DECLARATION'); L.push('The documents referenced above are true copies of the records held for these suppliers. Where a testing interval requested is not covered by an analysis on file, this is stated openly rather than omitted.');
