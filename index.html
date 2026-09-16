@@ -122,10 +122,12 @@ function toast(m){ const t=document.createElement('div'); t.className='toast'; t
   document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
 
 const KINDS = { residue:'שאריות הדברה', micro:'מיקרוביולוגיה', water:'בדיקת מים', audit:'דוח מבדק',
-  cert:'תעודה', grasp:'GRASP', ppl:'רשימת תכשירים', declaration:'הצהרת ספק', other:'אחר' };
+  cert:'תעודה', grasp:'GRASP', ppl:'רשימת תכשירים — רשמית', ppl_farm:'רשימת תכשירים — של המגדל',
+  declaration:'הצהרת ספק', other:'אחר' };
 const KINDS_EN = { residue:'Pesticide residue analysis', micro:'Microbiological analysis',
   water:'Water analysis', audit:'Audit report', cert:'Certificate', grasp:'GRASP',
-  ppl:'Plant protection product list', declaration:'Supplier declaration', other:'Other' };
+  ppl:'Plant protection product list (national)',
+  ppl_farm:'Plant protection product list (grower)', declaration:'Supplier declaration', other:'Other' };
 const RESULTS = { pass:'עובר', pass_qualified:'עובר בהסתייגות', fail:'נכשל', pending:'ממתין', na:'לא רלוונטי' };
 const RESULTS_EN = { pass:'Within specification', pass_qualified:'Accepted with limitations',
   fail:'Not accepted', pending:'Pending', na:'—' };
@@ -571,7 +573,7 @@ let pSel = new Set(), pW = 180, pKinds = new Set(['residue','micro','cert','gras
 function vPack(){
   const active = growers.filter(g=>g.active!==false && !/chain of custody/i.test(g.name||'')).sort((a,b)=>(a.country||'').localeCompare(b.country||'')||a.name.localeCompare(b.name));
   if(!pSel.size) active.forEach(g=>pSel.add(g.id));
-  const KOPTS = [['residue','שאריות'],['micro','מיקרוביולוגיה'],['water','מים'],['cert','תעודות'],['grasp','GRASP'],['audit','מבדקים'],['ppl','PPL']];
+  const KOPTS = [['residue','שאריות'],['micro','מיקרוביולוגיה'],['water','מים'],['cert','תעודות'],['grasp','GRASP'],['audit','מבדקים'],['ppl','PPL רשמי'],['ppl_farm','PPL של המגדל']];
   el('main').innerHTML = `
     <h2>מגדלים</h2>
     <div class="btnrow" style="margin-top:0">
